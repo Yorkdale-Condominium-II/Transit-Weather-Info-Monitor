@@ -33,6 +33,10 @@
       --wx-dim:       rgba(43,133,200,0.15);
       --wx-border:    rgba(43,133,200,0.35);
 
+      --via:          #005DAA;
+      --via-dim:      rgba(0,93,170,0.15);
+      --via-border:   rgba(0,93,170,0.35);
+
       --good:         #22C55E;
       --warn:         #F59E0B;
       --bad:          #EF4444;
@@ -110,22 +114,32 @@
     /* ---- Main content ---- */
     .content {
       display: grid;
-      grid-template-columns: 320px 1fr;
+      grid-template-columns: 280px 1fr 320px;
+      gap: 1px;
+      background: var(--border);
+      overflow: hidden;
+    }
+    /* Center wrapper: TTC on top, GO Transit below */
+    .col-center {
+      display: grid;
       grid-template-rows: 55fr 45fr;
       gap: 1px;
       background: var(--border);
       overflow: hidden;
+      min-height: 0;
     }
     .col {
       background: var(--bg);
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      min-height: 0;
     }
-    /* Column identity — layout placement + brand tint */
-    .col-wx  { grid-row: 1 / 3; background: var(--wx-dim);  }
+    /* Column brand tints */
+    .col-wx  { background: var(--wx-dim);  }
     .col-ttc { background: var(--ttc-dim); }
     .col-go  { background: var(--go-dim);  }
+    .col-ic  { background: var(--via-dim); }
 
 
     /* ================================================================
@@ -329,6 +343,24 @@
     .ic-flix    { background: #73D700; color: #000; }
     .ic-dest    { font-size: clamp(0.62rem, 0.9vh, 0.72rem); color: var(--muted); line-height: 1.5; }
 
+    /* VIA Rail */
+    .via-stripe { background: var(--via); }
+    .via-chip { background: var(--via); color: #fff; }
+
+    /* Next-departure feature (Union Station timing) */
+    .union-after {
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.3rem 0.85rem;
+      background: rgba(0,0,0,0.25);
+      border-bottom: 1px solid var(--border);
+      font-size: clamp(0.58rem, 0.8vh, 0.65rem);
+    }
+    .ua-label { color: var(--dim); }
+    .ua-time  { color: var(--warn); font-family: var(--f-mono); font-weight: 700; font-variant-numeric: tabular-nums; }
+    .ua-note  { color: var(--dim); font-size: 0.58rem; margin-left: auto; }
+    .next-dep { font-family: var(--f-mono); font-size: clamp(0.6rem, 0.85vh, 0.7rem); color: var(--warn); font-weight: 700; font-variant-numeric: tabular-nums; }
+    .leave-dep { font-family: var(--f-mono); font-size: clamp(0.55rem, 0.75vh, 0.62rem); color: var(--dim); font-variant-numeric: tabular-nums; }
+
     /* ================================================================
        STATUS DOT
        ================================================================ */
@@ -345,11 +377,11 @@
     /* ================================================================
        RESPONSIVE (for non-TV screens)
        ================================================================ */
-    @media (max-width: 1000px) {
+    @media (max-width: 1100px) {
       body { overflow: auto; }
       .board { grid-template-rows: 64px auto; height: auto; }
       .content { grid-template-columns: 1fr; grid-template-rows: auto; background: var(--bg); }
-      .col-wx { grid-row: auto; }
+      .col-center { grid-template-rows: auto; }
       .col { overflow: visible; }
       .bus-grid { grid-template-columns: 1fr; }
     }
@@ -400,24 +432,38 @@
       </div>
     </div>
 
-    <!-- ---- TOP-RIGHT: TTC ---- -->
-    <div class="col col-ttc">
-      <div class="sec-head">
-        <div class="sec-stripe ttc-stripe"></div>
-        <span class="sec-label">Toronto Transit Commission</span>
+    <!-- ---- CENTRE: TTC (top) + GO Transit (bottom) ---- -->
+    <div class="col-center">
+
+      <div class="col col-ttc">
+        <div class="sec-head">
+          <div class="sec-stripe ttc-stripe"></div>
+          <span class="sec-label">Toronto Transit Commission</span>
+        </div>
+        <div class="sec-body" id="ttc-body">
+          <div class="state-msg">Loading…</div>
+        </div>
       </div>
-      <div class="sec-body" id="ttc-body">
-        <div class="state-msg">Loading…</div>
+
+      <div class="col col-go">
+        <div class="sec-head">
+          <div class="sec-stripe go-stripe"></div>
+          <span class="sec-label">GO Transit</span>
+        </div>
+        <div class="sec-body" id="go-body">
+          <div class="state-msg">Loading…</div>
+        </div>
       </div>
+
     </div>
 
-    <!-- ---- BOTTOM-RIGHT: GO Transit ---- -->
-    <div class="col col-go">
+    <!-- ---- RIGHT: Intercity Rail & Coach ---- -->
+    <div class="col col-ic">
       <div class="sec-head">
-        <div class="sec-stripe go-stripe"></div>
-        <span class="sec-label">GO Transit</span>
+        <div class="sec-stripe via-stripe"></div>
+        <span class="sec-label">Intercity Rail &amp; Coach</span>
       </div>
-      <div class="sec-body" id="go-body">
+      <div class="sec-body" id="ic-body">
         <div class="state-msg">Loading…</div>
       </div>
     </div>
@@ -433,6 +479,93 @@
   'use strict';
 
   var LAT = 43.722, LON = -79.444;
+
+  /* ================================================================
+     UNION STATION TIMING
+     Walk to Yorkdale Station ~12 min + wait ~3 min + Line 1 south
+     Yorkdale → Union (9 stops) ~22 min ≈ 37–40 min total
+     ================================================================ */
+  var UNION_TRAVEL_MIN = 38;
+
+  /* ---- Format a Date as 12-hour time ---- */
+  function fmt12(d) {
+    return d.toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit',hour12:true});
+  }
+
+  /* ---- Next departure catchable from 120 Varna Drive ----
+     deps:      [[h,m], …] in 24-hour time
+     operDays:  [0..6] Sun=0 / null means every day              */
+  function nextCatchableDep(deps, operDays) {
+    var catchableBy = new Date(Date.now() + UNION_TRAVEL_MIN * 60 * 1000);
+    var best = null;
+    for (var offset = 0; offset < 8; offset++) {
+      var day = new Date(catchableBy);
+      day.setDate(day.getDate() + offset);
+      if (operDays && operDays.indexOf(day.getDay()) === -1) continue;
+      deps.forEach(function(d) {
+        var dt = new Date(day);
+        dt.setHours(d[0], d[1], 0, 0);
+        if (dt > catchableBy && (!best || dt < best)) best = dt;
+      });
+      if (best) break;
+    }
+    return best; /* Date or null */
+  }
+
+  /* ---- Format a next-departure result for display ---- */
+  function fmtDep(dep) {
+    if (!dep) return {next:'—', leave:'—'};
+    var now = new Date();
+    var prefix = dep.toDateString() === now.toDateString() ? '' :
+                 dep.toLocaleDateString('en-CA',{weekday:'short'}) + ' ';
+    var leaveBy = new Date(dep.getTime() - UNION_TRAVEL_MIN * 60 * 1000);
+    return {next: prefix + fmt12(dep), leave: prefix + fmt12(leaveBy)};
+  }
+
+  /* ---- Union-after banner (inserted at top of GO Train section) ---- */
+  function unionAfterBanner() {
+    var t = fmt12(new Date(Date.now() + UNION_TRAVEL_MIN * 60 * 1000));
+    return '<div class="union-after">'
+      + '<span class="ua-label">Board at Union after:</span>'
+      + '<span class="ua-time">' + t + '</span>'
+      + '<span class="ua-note">~' + UNION_TRAVEL_MIN + ' min via Line 1 from Yorkdale</span>'
+      + '</div>';
+  }
+
+  /* ================================================================
+     VIA RAIL — Toronto Union Station schedule (approximate)
+     Source: viarail.ca public timetable
+     ================================================================ */
+  var VIA_ROUTES = [
+    {
+      code: 'COR', name: 'Corridor — Montréal',
+      sub:  'via Kingston · Brockville · (Ottawa)',
+      days: 'Daily',
+      deps: [[7,0],[9,0],[12,0],[14,0],[16,30],[18,0],[22,30]],
+      operDays: null
+    },
+    {
+      code: 'WIN', name: 'Corridor — Windsor',
+      sub:  'Oakville · Hamilton · Brantford · London',
+      days: 'Daily',
+      deps: [[8,0],[12,30],[17,30]],
+      operDays: null
+    },
+    {
+      code: 'ML',  name: 'Maple Leaf',
+      sub:  'Niagara Falls → New York Penn (with Amtrak)',
+      days: 'Daily',
+      deps: [[8,28]],
+      operDays: null
+    },
+    {
+      code: 'CAN', name: 'The Canadian',
+      sub:  'Sudbury · Winnipeg · Edmonton · Vancouver',
+      days: 'Tue · Thu · Sat',
+      deps: [[22,0]],
+      operDays: [2,4,6]   /* Tue=2, Thu=4, Sat=6 */
+    }
+  ];
 
   /* ---- WMO codes ---- */
   var WMO = {
@@ -661,7 +794,8 @@
   ];
 
   function buildGOTrainHtml() {
-    var h = '<div class="subway-title">GO Train Service Status</div>';
+    var h = '<div class="subway-title">GO Train — Union Station</div>'
+      + unionAfterBanner();
     GO_TRAIN_LINES.forEach(function(line) {
       h += '<div class="svc-row">'
         + '<span class="dot d-ok"></span>'
@@ -675,29 +809,11 @@
 
   function renderGO() {
     var busRoutes = [
-      {num:'40',  dest:'Barrie GO Station',  dir:'↑ Barrie · ↓ Yorkdale',         freq:'Peak: ~30 min'},
-      {num:'40A', dest:'Barrie (express)',    dir:'↑ Barrie · ↓ Yorkdale',         freq:'Peak · express'},
-      {num:'40C', dest:'Cookstown / Barrie', dir:'↑ Cookstown · Barrie',           freq:'Select trips'},
-      {num:'68',  dest:'Bradford / Barrie',  dir:'↑ E. Gwillimbury · Bradford',    freq:'Peak service'},
-      {num:'64',  dest:'Newmarket GO',       dir:'↑ Newmarket GO Station',         freq:'Peak service'}
-    ];
-
-    var intercity = [
-      {
-        cls:   'ic-megabus',
-        badge: 'Megabus',
-        dests: ['Hamilton · London · Ottawa', 'Montréal · Kingston · Niagara']
-      },
-      {
-        cls:   'ic-on',
-        badge: 'Ont. Northland',
-        dests: ['Barrie · Huntsville · North Bay', 'Sudbury · New Liskeard · Timmins']
-      },
-      {
-        cls:   'ic-flix',
-        badge: 'FlixBus',
-        dests: ['Ottawa · Montréal', 'London · Niagara Falls']
-      }
+      {num:'40',  dest:'Barrie GO Station',  dir:'↑ Barrie · ↓ Yorkdale',      freq:'Peak: ~30 min'},
+      {num:'40A', dest:'Barrie (express)',    dir:'↑ Barrie · ↓ Yorkdale',      freq:'Peak · express'},
+      {num:'40C', dest:'Cookstown / Barrie', dir:'↑ Cookstown · Barrie',        freq:'Select trips'},
+      {num:'68',  dest:'Bradford / Barrie',  dir:'↑ E. Gwillimbury · Bradford', freq:'Peak service'},
+      {num:'64',  dest:'Newmarket GO',       dir:'↑ Newmarket GO Station',      freq:'Peak service'}
     ];
 
     var h = '<div class="subway-block" id="go-train-status-block">' + buildGOTrainHtml() + '</div>'
@@ -716,19 +832,7 @@
         + '</div></div>';
     });
 
-    h += '</div>'
-      + '<div class="subway-block">'
-      + '<div class="subway-title">Intercity Coaches — Yorkdale Mall</div>';
-
-    intercity.forEach(function(co) {
-      h += '<div class="ic-card">'
-        + '<span class="ic-badge ' + co.cls + '">' + esc(co.badge) + '</span>'
-        + '<div class="ic-dest">' + co.dests.map(esc).join('<br>') + '</div>'
-        + '</div>';
-    });
-
     h += '</div>';
-
     document.getElementById('go-body').innerHTML = h;
   }
 
@@ -745,7 +849,8 @@
           });
         });
 
-        var html = '<div class="subway-title">GO Train Service Status</div>';
+        var html = '<div class="subway-title">GO Train — Union Station</div>'
+          + unionAfterBanner();
         GO_TRAIN_LINES.forEach(function(line) {
           var ok = !line.active.length;
           html += '<div class="svc-row">'
@@ -778,6 +883,66 @@
         if (block) block.innerHTML = html;
       })
       .catch(function(){ /* keep "Good service" defaults */ });
+  }
+
+  /* ================================================================
+     INTERCITY COLUMN — VIA Rail + coaches
+     ================================================================ */
+  function renderIntercity() {
+    var coaches = [
+      {
+        cls:   'ic-megabus',
+        badge: 'Megabus',
+        dests: ['Hamilton · London · Ottawa', 'Montréal · Kingston · Niagara']
+      },
+      {
+        cls:   'ic-on',
+        badge: 'Ont. Northland',
+        dests: ['Barrie · Huntsville · North Bay', 'Sudbury · New Liskeard · Timmins']
+      },
+      {
+        cls:   'ic-flix',
+        badge: 'FlixBus',
+        dests: ['Ottawa · Montréal', 'London · Niagara Falls']
+      }
+    ];
+
+    /* VIA Rail section */
+    var h = '<div class="subway-block">'
+      + '<div class="subway-title">VIA Rail — Union Station</div>'
+      + unionAfterBanner();
+
+    VIA_ROUTES.forEach(function(r) {
+      var dep = nextCatchableDep(r.deps, r.operDays);
+      var info = fmtDep(dep);
+      h += '<div class="svc-row">'
+        + '<span class="line-chip via-chip">' + esc(r.code) + '</span>'
+        + '<div class="svc-info">'
+        + '<div class="svc-name">' + esc(r.name) + '</div>'
+        + '<div class="svc-sub">' + esc(r.sub) + ' &nbsp;·&nbsp; ' + esc(r.days) + '</div>'
+        + '<div class="svc-sub">'
+        + '<span class="next-dep">↗ ' + info.next + '</span>'
+        + (dep ? ' <span class="leave-dep">· leave by ' + info.leave + '</span>' : '')
+        + '</div>'
+        + '</div></div>';
+    });
+
+    h += '</div>';
+
+    /* Intercity coaches section */
+    h += '<div class="subway-block">'
+      + '<div class="subway-title">Intercity Coaches — Yorkdale Mall</div>';
+
+    coaches.forEach(function(co) {
+      h += '<div class="ic-card">'
+        + '<span class="ic-badge ' + co.cls + '">' + esc(co.badge) + '</span>'
+        + '<div class="ic-dest">' + co.dests.map(esc).join('<br>') + '</div>'
+        + '</div>';
+    });
+
+    h += '</div>';
+
+    document.getElementById('ic-body').innerHTML = h;
   }
 
   /* ================================================================
@@ -857,6 +1022,7 @@
     loadWeather();
     loadTTC();
     renderGO();
+    renderIntercity();
     markUpdated();
     loadSubwayAlerts();
     loadGOTrainStatus();
