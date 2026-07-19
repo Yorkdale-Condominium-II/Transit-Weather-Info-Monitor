@@ -241,6 +241,9 @@
     .sd-ok   { background: var(--good); }
     .sd-warn { background: var(--warn); }
     .sd-bad  { background: var(--bad); }
+    .alerts-scroll { max-height: 18vh; overflow-y: auto; border-top: 1px solid var(--border); }
+    .alert-row { align-items: flex-start; }
+    .alert-desc { font-size: 0.68rem; color: var(--muted); margin-top: 0.2rem; line-height: 1.4; }
 
     /* Bus predictions */
     .bus-grid {
@@ -580,10 +583,11 @@
   }
 
   function buildSubwayHtml() {
-    return '<div class="subway-block">'
+    return '<div class="subway-block" id="subway-status-block">'
       + '<div class="subway-title">Subway Service Status</div>'
       + '<div class="svc-row"><span class="dot d-ok"></span><span class="line-chip l1">Line 1</span><span class="svc-name">Yonge–University</span><span class="svc-status s-ok">Good service</span></div>'
       + '<div class="svc-row"><span class="dot d-ok"></span><span class="line-chip l2">Line 2</span><span class="svc-name">Bloor–Danforth</span><span class="svc-status s-ok">Good service</span></div>'
+      + '<div class="svc-row"><span class="dot d-ok"></span><span class="line-chip l4">Line 4</span><span class="svc-name">Sheppard</span><span class="svc-status s-ok">Good service</span></div>'
       + '</div>';
   }
 
@@ -676,28 +680,60 @@
      SUBWAY ALERTS  — TTC live-alerts API
      ================================================================ */
   function loadSubwayAlerts() {
+    var LINES = [
+      { num: 1, cls: 'l1', name: 'Yonge–University', kw: ['line 1','yonge','university'] },
+      { num: 2, cls: 'l2', name: 'Bloor–Danforth',   kw: ['line 2','bloor','danforth']   },
+      { num: 4, cls: 'l4', name: 'Sheppard',              kw: ['line 4','sheppard']            }
+    ];
+
     fetch('https://alerts.ttc.ca/api/alerts/live-alerts')
       .then(function(r){ return r.json(); })
       .then(function(data) {
         var alerts = Array.isArray(data.alerts) ? data.alerts : (Array.isArray(data) ? data : []);
-        var l1 = alerts.filter(function(a){
-          var t = (a.title || a.header || '').toLowerCase();
-          return t.indexOf('line 1')!==-1 || t.indexOf('yonge')!==-1 || t.indexOf('university')!==-1;
-        });
-        if (!l1.length) return; /* keep "Good service" default */
 
-        /* Replace subway block with alert info */
-        var ttcEl = document.getElementById('ttc-body');
-        if (!ttcEl) return;
-        var alertHtml = '<div class="subway-block">'
-          + '<div class="subway-title">Subway Service Status — Line 1 Alerts</div>';
-        l1.slice(0,2).forEach(function(a) {
-          alertHtml += '<div class="svc-row"><span class="dot d-warn"></span><span class="svc-name">' + esc(a.title || a.header || 'Alert') + '</span></div>';
+        /* Tag each line with matching alerts */
+        LINES.forEach(function(line) {
+          line.active = alerts.filter(function(a) {
+            var t = ((a.title || a.header || '') + ' ' + (a.description || a.body || '')).toLowerCase();
+            return line.kw.some(function(k){ return t.indexOf(k) !== -1; });
+          });
         });
-        alertHtml += '</div>';
-        ttcEl.innerHTML = alertHtml + ttcEl.innerHTML.replace(/<div class="subway-block">[\s\S]*?<\/div>\s*<\/div>/, '');
+
+        /* Build line-status rows */
+        var html = '<div class="subway-title">Subway Service Status</div>';
+        LINES.forEach(function(line) {
+          var ok = !line.active.length;
+          html += '<div class="svc-row">'
+            + '<span class="dot ' + (ok ? 'd-ok' : 'd-warn') + '"></span>'
+            + '<span class="line-chip ' + line.cls + '">Line ' + line.num + '</span>'
+            + '<span class="svc-name">' + line.name + '</span>'
+            + '<span class="svc-status ' + (ok ? 's-ok' : 's-warn') + '">'
+            + (ok ? 'Good service' : line.active.length + ' alert' + (line.active.length > 1 ? 's' : ''))
+            + '</span></div>';
+        });
+
+        /* All alerts section */
+        if (alerts.length) {
+          html += '<div class="subway-title" style="padding-top:0.5rem">Active Alerts (' + alerts.length + ')</div>'
+            + '<div class="alerts-scroll">';
+          alerts.forEach(function(a) {
+            var title = a.title || a.header || 'Alert';
+            var desc  = a.description || a.body || a.text || '';
+            html += '<div class="svc-row alert-row">'
+              + '<span class="dot d-warn" style="margin-top:0.2rem;flex-shrink:0"></span>'
+              + '<div style="flex:1;min-width:0">'
+              + '<div class="svc-name">' + esc(title) + '</div>'
+              + (desc ? '<div class="alert-desc">' + esc(desc.slice(0, 160)) + (desc.length > 160 ? '…' : '') + '</div>' : '')
+              + '</div></div>';
+          });
+          html += '</div>';
+        }
+
+        /* Update the subway block in-place */
+        var block = document.getElementById('subway-status-block');
+        if (block) block.innerHTML = html;
       })
-      .catch(function(){ /* keep default */ });
+      .catch(function(){ /* keep "Good service" defaults */ });
   }
 
   /* ================================================================
