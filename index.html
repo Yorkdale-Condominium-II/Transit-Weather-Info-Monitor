@@ -59,7 +59,7 @@
        ================================================================ */
     .board {
       display: grid;
-      grid-template-rows: 72px 1fr 52px;
+      grid-template-rows: 72px 1fr;
       height: 100vh;
       width: 100vw;
     }
@@ -122,20 +122,6 @@
       overflow: hidden;
     }
 
-    /* ---- Footer strip ---- */
-    .ticker {
-      border-top: 1px solid var(--border);
-      background: var(--surface);
-      display: flex;
-      align-items: center;
-      padding: 0 2rem;
-      gap: 2rem;
-      font-size: 0.72rem;
-      color: var(--dim);
-      overflow: hidden;
-    }
-    .ticker-item { white-space: nowrap; display: flex; align-items: center; gap: 0.4rem; }
-    .ticker-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 
     /* ================================================================
        SECTION HEADERS
@@ -153,7 +139,7 @@
       font-size: 0.65rem; font-weight: 700; text-transform: uppercase;
       letter-spacing: 0.1em; color: var(--muted);
     }
-    .sec-body { padding: 1.25rem; flex: 1; overflow-y: auto; scrollbar-width: none; }
+    .sec-body { padding: clamp(0.6rem, 1.3vh, 1.25rem); flex: 1; overflow-y: auto; scrollbar-width: none; }
     .sec-body::-webkit-scrollbar { display: none; }
 
     /* ================================================================
@@ -163,33 +149,33 @@
 
     .wx-current {
       text-align: center;
-      padding: 1.5rem 0 1.25rem;
+      padding: clamp(0.75rem, 1.4vh, 1.5rem) 0 clamp(0.6rem, 1.1vh, 1.25rem);
       border-bottom: 1px solid var(--border);
-      margin-bottom: 1.25rem;
+      margin-bottom: clamp(0.5rem, 1vh, 1.25rem);
     }
-    .wx-icon { font-size: 3.5rem; line-height: 1; margin-bottom: 0.5rem; }
+    .wx-icon { font-size: clamp(2rem, 3.8vh, 3.5rem); line-height: 1; margin-bottom: clamp(0.2rem, 0.5vh, 0.5rem); }
     .wx-temp {
-      font-size: 4rem; font-weight: 700; line-height: 1;
+      font-size: clamp(2.5rem, 4.5vh, 4rem); font-weight: 700; line-height: 1;
       color: var(--text); font-variant-numeric: tabular-nums;
     }
-    .wx-unit { font-size: 1.75rem; font-weight: 400; color: var(--muted); }
-    .wx-cond { font-size: 0.9rem; color: var(--muted); margin-top: 0.35rem; }
-    .wx-feel { font-size: 0.78rem; color: var(--dim); margin-top: 0.15rem; }
+    .wx-unit { font-size: clamp(1.1rem, 2vh, 1.75rem); font-weight: 400; color: var(--muted); }
+    .wx-cond { font-size: clamp(0.75rem, 1.1vh, 0.9rem); color: var(--muted); margin-top: 0.25rem; }
+    .wx-feel { font-size: clamp(0.65rem, 0.95vh, 0.78rem); color: var(--dim); margin-top: 0.1rem; }
 
-    .wx-stats { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.25rem; }
+    .wx-stats { display: flex; flex-direction: column; gap: clamp(0.25rem, 0.6vh, 0.5rem); margin-bottom: clamp(0.5rem, 1vh, 1.25rem); }
     .wx-stat {
       display: flex; justify-content: space-between; align-items: center;
-      padding: 0.45rem 0.65rem;
+      padding: clamp(0.25rem, 0.55vh, 0.45rem) 0.65rem;
       background: var(--surface); border-radius: var(--r);
-      font-size: 0.78rem;
+      font-size: clamp(0.65rem, 1vh, 0.78rem);
     }
     .wx-stat-label { color: var(--muted); }
     .wx-stat-val { font-family: var(--f-mono); color: var(--text); font-variant-numeric: tabular-nums; }
 
-    .wx-forecast { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; }
+    .wx-forecast { display: grid; grid-template-columns: repeat(2, 1fr); gap: clamp(0.3rem, 0.6vh, 0.5rem); }
     .fc {
       background: var(--surface); border-radius: var(--r);
-      padding: 0.65rem 0.5rem; text-align: center;
+      padding: clamp(0.35rem, 0.8vh, 0.65rem) 0.5rem; text-align: center;
       border: 1px solid var(--border);
     }
     .fc.today { border-color: var(--wx-border); background: var(--wx-dim); }
@@ -207,20 +193,20 @@
 
     /* Subway status */
     .subway-block {
-      margin-bottom: 1.25rem;
+      margin-bottom: clamp(0.5rem, 1vh, 1.25rem);
       border: 1px solid var(--border);
       border-radius: var(--r);
       overflow: hidden;
     }
     .subway-title {
-      font-size: 0.65rem; font-weight: 700; text-transform: uppercase;
-      letter-spacing: 0.08em; padding: 0.5rem 0.85rem;
+      font-size: clamp(0.58rem, 0.8vh, 0.65rem); font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.08em; padding: clamp(0.28rem, 0.55vh, 0.5rem) 0.85rem;
       background: var(--surface-2); color: var(--muted);
       border-bottom: 1px solid var(--border);
     }
     .svc-row {
-      display: flex; align-items: center; gap: 0.75rem;
-      padding: 0.65rem 0.85rem;
+      display: flex; align-items: center; gap: 0.65rem;
+      padding: clamp(0.28rem, 0.7vh, 0.65rem) 0.85rem;
       border-bottom: 1px solid var(--border);
     }
     .svc-row:last-child { border-bottom: none; }
@@ -242,8 +228,8 @@
     .go-st { background: #794400; color: #fff; }
     .go-rh { background: #009AC7; color: #fff; }
     .go-mi { background: #F58025; color: #fff; }
-    .svc-name { font-size: 0.82rem; color: var(--text); flex: 1; }
-    .svc-status { font-size: 0.72rem; font-weight: 600; }
+    .svc-name { font-size: clamp(0.7rem, 1.1vh, 0.82rem); color: var(--text); flex: 1; }
+    .svc-status { font-size: clamp(0.6rem, 0.9vh, 0.72rem); font-weight: 600; }
     .s-ok   { color: var(--good); }
     .s-warn { color: var(--warn); }
     .s-bad  { color: var(--bad); }
@@ -259,14 +245,14 @@
     .bus-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 0.75rem;
+      gap: clamp(0.4rem, 0.9vh, 0.75rem);
     }
     .bus-card {
       background: var(--surface);
       border: 1px solid var(--border);
       border-top: 2px solid var(--ttc);
       border-radius: var(--r);
-      padding: 0.85rem;
+      padding: clamp(0.5rem, 1vh, 0.85rem);
       overflow: hidden;
     }
     .bus-head { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem; }
@@ -289,24 +275,24 @@
     .go-stripe { background: var(--go); }
 
     .go-terminal {
-      display: flex; flex-direction: column; gap: 0.2rem;
-      padding: 0.85rem;
+      display: flex; flex-direction: column; gap: 0.15rem;
+      padding: clamp(0.4rem, 0.9vh, 0.85rem);
       background: var(--go-dim);
       border: 1px solid var(--go-border);
       border-radius: var(--r);
-      margin-bottom: 1.25rem;
+      margin-bottom: clamp(0.4rem, 0.9vh, 1.25rem);
     }
-    .go-terminal-name { font-size: 0.82rem; font-weight: 700; color: var(--go); }
-    .go-terminal-sub { font-size: 0.68rem; color: var(--muted); }
+    .go-terminal-name { font-size: clamp(0.7rem, 1.1vh, 0.82rem); font-weight: 700; color: var(--go); }
+    .go-terminal-sub { font-size: clamp(0.58rem, 0.85vh, 0.68rem); color: var(--muted); }
 
-    .go-routes { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.25rem; }
+    .go-routes { display: flex; flex-direction: column; gap: clamp(0.25rem, 0.6vh, 0.5rem); margin-bottom: clamp(0.4rem, 0.9vh, 1.25rem); }
     .go-card {
       background: var(--surface);
       border: 1px solid var(--border);
       border-left: 3px solid var(--go);
       border-radius: 0 var(--r) var(--r) 0;
-      padding: 0.7rem 0.85rem;
-      display: flex; align-items: center; gap: 0.75rem;
+      padding: clamp(0.35rem, 0.8vh, 0.7rem) 0.85rem;
+      display: flex; align-items: center; gap: 0.65rem;
     }
     .go-num {
       background: var(--go); color: #fff;
@@ -349,7 +335,7 @@
        ================================================================ */
     @media (max-width: 1000px) {
       body { overflow: auto; }
-      .board { grid-template-rows: 64px auto auto; height: auto; }
+      .board { grid-template-rows: 64px auto; height: auto; }
       .content { grid-template-columns: 1fr; background: var(--bg); }
       .col { overflow: visible; }
       .bus-grid { grid-template-columns: 1fr; }
@@ -426,17 +412,6 @@
   </div>
 
 
-  <!-- ============================================================
-       FOOTER TICKER
-       ============================================================ -->
-  <footer class="ticker" aria-label="Quick reference">
-    <div class="ticker-item"><span class="ticker-dot d-ok"></span>Yorkdale Station — Line 1, ~5 min walk</div>
-    <div class="ticker-item"><span class="ticker-dot d-ok"></span>Wilson Station — Line 1, ~12 min walk</div>
-    <div class="ticker-item"><span class="ticker-dot" style="background:var(--go)"></span>Yorkdale GO Terminal — ~8 min walk, inside mall</div>
-    <div class="ticker-item"><span class="ticker-dot" style="background:var(--ttc)"></span>Route 29 Dufferin — 24 h service</div>
-    <div class="ticker-item"><span class="ticker-dot" style="background:var(--ttc)"></span>Route 128 Stanley Greene — serves Varna Dr</div>
-    <div class="ticker-item"><span class="ticker-dot" style="background:var(--wx)"></span>Weather: Open-Meteo · Transit: TTC &amp; Metrolinx</div>
-  </footer>
 
 </div><!-- .board -->
 
