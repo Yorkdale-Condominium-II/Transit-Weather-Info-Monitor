@@ -234,6 +234,7 @@
     .l4 { background: #9B2893; color: #fff; }
     .l5 { background: #F18A00; color: #fff; }
     .l6 { background: #00AEEF; color: #000; }
+    .go-chip { background: var(--go); color: #fff; }
     .svc-name { font-size: 0.82rem; color: var(--text); flex: 1; }
     .svc-status { font-size: 0.72rem; font-weight: 600; }
     .s-ok   { color: var(--good); }
@@ -552,37 +553,43 @@
   }
 
   function loadTTC() {
-    /* Subway status */
     var subwayHtml = buildSubwayHtml();
 
-    /* Bus predictions via UMO — only keep stops within MAX_STOP_DIST */
+    /* For each route, collect ALL stops within MAX_STOP_DIST (not just nearest) */
     var cfgPromises = TTC_ROUTES.map(function(route) {
       return fetch(UMO + '&command=routeConfig&r=' + route.tag + '&verbose')
         .then(function(r){ return r.text(); })
         .then(function(txt) {
           var xml = new DOMParser().parseFromString(txt,'text/xml');
-          var stops = xml.querySelectorAll('stop[lat]');
-          var best = null, bestDist = Infinity;
-          stops.forEach(function(s) {
+          var nearby = [];
+          xml.querySelectorAll('stop[lat]').forEach(function(s) {
             var d = haversine(LAT,LON,parseFloat(s.getAttribute('lat')),parseFloat(s.getAttribute('lon')));
-            if (d < bestDist) { bestDist = d; best = s; }
+            if (d <= MAX_STOP_DIST) {
+              nearby.push({route:route, stopTag:s.getAttribute('tag'), stopTitle:s.getAttribute('title'), dist:Math.round(d)});
+            }
           });
-          if (!best || bestDist > MAX_STOP_DIST) return null;
-          return {route:route, stopTag:best.getAttribute('tag'), stopTitle:best.getAttribute('title'), dist:Math.round(bestDist)};
+          return nearby;
         })
-        .catch(function(){ return null; });
+        .catch(function(){ return []; });
     });
 
     Promise.all(cfgPromises).then(function(results) {
-      var valid = results.filter(Boolean);
-      if (!valid.length) { renderTTCFallback(subwayHtml); return; }
+      /* Flatten; dedupe by route+stopTag */
+      var seen = {}, allStops = [];
+      results.forEach(function(arr) {
+        arr.forEach(function(s) {
+          var key = s.route.tag + '|' + s.stopTag;
+          if (!seen[key]) { seen[key] = true; allStops.push(s); }
+        });
+      });
+      if (!allStops.length) { renderTTCFallback(subwayHtml); return; }
 
-      var stopsParam = valid.map(function(v){ return '&stops='+v.route.tag+'|'+v.stopTag; }).join('');
+      var stopsParam = allStops.map(function(v){ return '&stops='+v.route.tag+'|'+v.stopTag; }).join('');
       return fetch(UMO + '&command=predictionsForMultiStops' + stopsParam)
         .then(function(r){ return r.text(); })
         .then(function(txt) {
           var xml = new DOMParser().parseFromString(txt,'text/xml');
-          renderTTC(subwayHtml, xml, valid);
+          renderTTC(subwayHtml, xml, allStops);
         });
     }).catch(function(){ renderTTCFallback(subwayHtml); });
   }
@@ -608,7 +615,9 @@
       var rt = pg.getAttribute('routeTag') || '';
       var rtTitle = pg.getAttribute('routeTitle') || rt;
       var stopTitle = pg.getAttribute('stopTitle') || '';
-      var info = routeInfo.find(function(r){ return r.route.tag === rt; });
+      var stopTag = pg.getAttribute('stopTag') || '';
+      var info = routeInfo.find(function(r){ return r.route.tag === rt && r.stopTag === stopTag; })
+             || routeInfo.find(function(r){ return r.route.tag === rt; });
       var dirEls = pg.querySelectorAll('direction');
 
       busHtml += '<div class="bus-card">'
@@ -639,22 +648,37 @@
   }
 
   function renderTTCFallback(subwayHtml) {
-    var fb = subwayHtml
-      + '<div class="state-msg">Live bus predictions unavailable.</div>'
-      + '<div style="display:flex;flex-direction:column;gap:0.35rem;margin-top:0.5rem">'
-      + ['128','29'].map(function(r){
-          return '<a href="https://www.ttc.ca/route-schedules-and-maps/routes/0'+r+'" target="_blank" class="go-link">'
-            + '<span>Route ' + r + ' Schedule</span><span class="go-link-arr">↗</span></a>';
-        }).join('')
-      + '</div>';
-    document.getElementById('ttc-body').innerHTML = fb;
+    document.getElementById('ttc-body').innerHTML = subwayHtml
+      + '<div class="state-msg">Bus predictions unavailable — retrying next refresh.</div>';
   }
 
   /* ================================================================
-     GO TRANSIT  — static routes from Yorkdale GO Terminal
+     GO TRANSIT — Train status + Yorkdale GO Bus Terminal
      ================================================================ */
+  var GO_TRAIN_LINES = [
+    {code:'BR',  name:'Barrie',         kw:['barrie']},
+    {code:'LE',  name:'Lakeshore East', kw:['lakeshore east']},
+    {code:'LW',  name:'Lakeshore West', kw:['lakeshore west']},
+    {code:'KI',  name:'Kitchener',      kw:['kitchener']},
+    {code:'ST',  name:'Stouffville',    kw:['stouffville']},
+    {code:'RH',  name:'Richmond Hill',  kw:['richmond hill']},
+    {code:'MI',  name:'Milton',         kw:['milton']}
+  ];
+
+  function buildGOTrainHtml() {
+    var h = '<div class="subway-title">GO Train Service Status</div>';
+    GO_TRAIN_LINES.forEach(function(line) {
+      h += '<div class="svc-row">'
+        + '<span class="dot d-ok"></span>'
+        + '<span class="line-chip go-chip">' + esc(line.code) + '</span>'
+        + '<span class="svc-name">' + esc(line.name) + '</span>'
+        + '<span class="svc-status s-ok">Good service</span></div>';
+    });
+    return h;
+  }
+
   function renderGO() {
-    var routes = [
+    var busRoutes = [
       {num:'40',  dest:'Barrie GO Station',  freq:'Peak: every 30 min'},
       {num:'40A', dest:'Barrie (express)',    freq:'Peak service'},
       {num:'40C', dest:'Cookstown / Barrie', freq:'Select trips'},
@@ -662,26 +686,69 @@
       {num:'64',  dest:'Newmarket GO',       freq:'Peak service'}
     ];
 
-    var h = '<div class="go-terminal">'
+    var h = '<div class="subway-block" id="go-train-status-block">' + buildGOTrainHtml() + '</div>'
+      + '<div class="go-terminal">'
       + '<div class="go-terminal-name">Yorkdale GO Bus Terminal</div>'
       + '<div class="go-terminal-sub">~8 min walk · inside Yorkdale Mall</div>'
       + '</div>'
       + '<div class="go-routes">';
 
-    routes.forEach(function(r) {
+    busRoutes.forEach(function(r) {
       h += '<div class="go-card">'
         + '<span class="go-num">' + esc(r.num) + '</span>'
         + '<div class="go-info"><div class="go-dest">' + esc(r.dest) + '</div><div class="go-freq">' + esc(r.freq) + '</div></div>'
         + '</div>';
     });
-
-    h += '</div>'
-      + '<div class="go-links">'
-      + '<a href="https://www.gotransit.com/en/trip-planning/plan-your-trip" target="_blank" class="go-link"><span>GO Trip Planner</span><span class="go-link-arr">↗</span></a>'
-      + '<a href="https://www.gotransit.com/en/service-updates" target="_blank" class="go-link"><span>GO Service Updates</span><span class="go-link-arr">↗</span></a>'
-      + '</div>';
+    h += '</div>';
 
     document.getElementById('go-body').innerHTML = h;
+  }
+
+  function loadGOTrainStatus() {
+    fetch('https://backend.gotransit.com/v2/api/ServiceAlerts')
+      .then(function(r){ return r.json(); })
+      .then(function(data) {
+        var alerts = Array.isArray(data) ? data : (Array.isArray(data.alerts) ? data.alerts : []);
+
+        GO_TRAIN_LINES.forEach(function(line) {
+          line.active = alerts.filter(function(a) {
+            var t = ((a.lineName || a.title || a.header || '') + ' ' + (a.description || a.body || '')).toLowerCase();
+            return line.kw.some(function(k){ return t.indexOf(k) !== -1; });
+          });
+        });
+
+        var html = '<div class="subway-title">GO Train Service Status</div>';
+        GO_TRAIN_LINES.forEach(function(line) {
+          var ok = !line.active.length;
+          html += '<div class="svc-row">'
+            + '<span class="dot ' + (ok ? 'd-ok' : 'd-warn') + '"></span>'
+            + '<span class="line-chip go-chip">' + esc(line.code) + '</span>'
+            + '<span class="svc-name">' + esc(line.name) + '</span>'
+            + '<span class="svc-status ' + (ok ? 's-ok' : 's-warn') + '">'
+            + (ok ? 'Good service' : line.active.length + ' alert' + (line.active.length > 1 ? 's' : ''))
+            + '</span></div>';
+        });
+
+        if (alerts.length) {
+          html += '<div class="subway-title" style="padding-top:0.4rem">Active Alerts (' + alerts.length + ')</div>'
+            + '<div class="alerts-scroll">';
+          alerts.forEach(function(a) {
+            var title = a.lineName || a.title || a.header || 'Alert';
+            var desc  = a.description || a.body || a.message || '';
+            html += '<div class="svc-row alert-row">'
+              + '<span class="dot d-warn" style="margin-top:0.2rem;flex-shrink:0"></span>'
+              + '<div style="flex:1;min-width:0">'
+              + '<div class="svc-name">' + esc(title) + '</div>'
+              + (desc ? '<div class="alert-desc">' + esc(desc.slice(0,160)) + (desc.length > 160 ? '…' : '') + '</div>' : '')
+              + '</div></div>';
+          });
+          html += '</div>';
+        }
+
+        var block = document.getElementById('go-train-status-block');
+        if (block) block.innerHTML = html;
+      })
+      .catch(function(){ /* keep "Good service" defaults */ });
   }
 
   /* ================================================================
@@ -763,6 +830,7 @@
     renderGO();
     markUpdated();
     loadSubwayAlerts();
+    loadGOTrainStatus();
   }
 
   refresh();
