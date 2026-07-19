@@ -119,10 +119,10 @@
       background: var(--border);
       overflow: hidden;
     }
-    /* Center wrapper: TTC on top, GO Transit below */
+    /* Center wrapper: TTC shrinks to content, GO fills remaining height */
     .col-center {
-      display: grid;
-      grid-template-rows: 33fr 67fr;
+      display: flex;
+      flex-direction: column;
       gap: 1px;
       background: var(--border);
       overflow: hidden;
@@ -135,10 +135,10 @@
       overflow: hidden;
       min-height: 0;
     }
-    /* Column brand tints */
+    /* Column brand tints + flex sizing for centre stack */
     .col-wx  { background: var(--wx-dim);  }
-    .col-ttc { background: var(--ttc-dim); }
-    .col-go  { background: var(--go-dim);  }
+    .col-ttc { flex: 0 0 auto; background: var(--ttc-dim); }
+    .col-go  { flex: 1; min-height: 0; background: var(--go-dim); }
     .col-ic  { background: var(--via-dim); }
 
 
@@ -311,6 +311,7 @@
 
     /* TTC body splits into two sub-columns: subway left, bus right */
     .col-ttc > .sec-body {
+      flex: none;
       padding: 0;
       overflow: hidden;
       display: grid;
@@ -418,7 +419,7 @@
       body { overflow: auto; }
       .board { grid-template-rows: 64px auto; height: auto; }
       .content { grid-template-columns: 1fr; grid-template-rows: auto; background: var(--bg); }
-      .col-center { grid-template-rows: auto; }
+
       .col { overflow: visible; }
       .bus-grid { grid-template-columns: 1fr; }
     }
