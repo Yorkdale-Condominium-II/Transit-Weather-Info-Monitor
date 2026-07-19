@@ -228,10 +228,12 @@
       font-size: 0.65rem; font-weight: 700; padding: 0.2rem 0.6rem;
       border-radius: 3px; white-space: nowrap; letter-spacing: 0.03em;
     }
-    .l1 { background: #FFB600; color: #000; }
-    .l2 { background: #1A7C3E; color: #fff; }
-    .l3 { background: #0066B2; color: #fff; }
-    .l4 { background: #8B1A1A; color: #fff; }
+    .l1 { background: #FFD100; color: #000; }
+    .l2 { background: #009A44; color: #fff; }
+    .l3 { background: #003594; color: #fff; }
+    .l4 { background: #9B2893; color: #fff; }
+    .l5 { background: #F18A00; color: #fff; }
+    .l6 { background: #00AEEF; color: #000; }
     .svc-name { font-size: 0.82rem; color: var(--text); flex: 1; }
     .svc-status { font-size: 0.72rem; font-weight: 600; }
     .s-ok   { color: var(--good); }
@@ -584,10 +586,13 @@
 
   function buildSubwayHtml() {
     return '<div class="subway-block" id="subway-status-block">'
-      + '<div class="subway-title">Subway Service Status</div>'
+      + '<div class="subway-title">Subway &amp; LRT Service Status</div>'
       + '<div class="svc-row"><span class="dot d-ok"></span><span class="line-chip l1">Line 1</span><span class="svc-name">Yonge–University</span><span class="svc-status s-ok">Good service</span></div>'
       + '<div class="svc-row"><span class="dot d-ok"></span><span class="line-chip l2">Line 2</span><span class="svc-name">Bloor–Danforth</span><span class="svc-status s-ok">Good service</span></div>'
+      + '<div class="svc-row"><span class="dot d-warn"></span><span class="line-chip l3">Line 3</span><span class="svc-name">Scarborough</span><span class="svc-status s-warn">Bus substitute service</span></div>'
       + '<div class="svc-row"><span class="dot d-ok"></span><span class="line-chip l4">Line 4</span><span class="svc-name">Sheppard</span><span class="svc-status s-ok">Good service</span></div>'
+      + '<div class="svc-row"><span class="dot d-ok"></span><span class="line-chip l5">Line 5</span><span class="svc-name">Eglinton Crosstown</span><span class="svc-status s-ok">Good service</span></div>'
+      + '<div class="svc-row"><span class="dot d-ok"></span><span class="line-chip l6">Line 6</span><span class="svc-name">Finch West LRT</span><span class="svc-status s-ok">Good service</span></div>'
       + '</div>';
   }
 
@@ -681,9 +686,12 @@
      ================================================================ */
   function loadSubwayAlerts() {
     var LINES = [
-      { num: 1, cls: 'l1', name: 'Yonge–University', kw: ['line 1','yonge','university'] },
-      { num: 2, cls: 'l2', name: 'Bloor–Danforth',   kw: ['line 2','bloor','danforth']   },
-      { num: 4, cls: 'l4', name: 'Sheppard',              kw: ['line 4','sheppard']            }
+      { num: 1, cls: 'l1', name: 'Yonge–University',   kw: ['line 1','yonge','university'],         busSub: false },
+      { num: 2, cls: 'l2', name: 'Bloor–Danforth',     kw: ['line 2','bloor','danforth'],           busSub: false },
+      { num: 3, cls: 'l3', name: 'Scarborough',        kw: ['line 3','scarborough'],                busSub: true  },
+      { num: 4, cls: 'l4', name: 'Sheppard',           kw: ['line 4','sheppard'],                   busSub: false },
+      { num: 5, cls: 'l5', name: 'Eglinton Crosstown', kw: ['line 5','eglinton','crosstown'],       busSub: false },
+      { num: 6, cls: 'l6', name: 'Finch West LRT',     kw: ['line 6','finch west','finch'],         busSub: false }
     ];
 
     fetch('https://alerts.ttc.ca/api/alerts/live-alerts')
@@ -700,16 +708,23 @@
         });
 
         /* Build line-status rows */
-        var html = '<div class="subway-title">Subway Service Status</div>';
+        var html = '<div class="subway-title">Subway &amp; LRT Service Status</div>';
         LINES.forEach(function(line) {
-          var ok = !line.active.length;
+          var hasAlert = line.active.length > 0;
+          var dotCls, statusCls, statusText;
+          if (line.busSub) {
+            dotCls = 'd-warn'; statusCls = 's-warn'; statusText = 'Bus substitute service';
+          } else if (hasAlert) {
+            dotCls = 'd-warn'; statusCls = 's-warn';
+            statusText = line.active.length + ' alert' + (line.active.length > 1 ? 's' : '');
+          } else {
+            dotCls = 'd-ok'; statusCls = 's-ok'; statusText = 'Good service';
+          }
           html += '<div class="svc-row">'
-            + '<span class="dot ' + (ok ? 'd-ok' : 'd-warn') + '"></span>'
+            + '<span class="dot ' + dotCls + '"></span>'
             + '<span class="line-chip ' + line.cls + '">Line ' + line.num + '</span>'
             + '<span class="svc-name">' + line.name + '</span>'
-            + '<span class="svc-status ' + (ok ? 's-ok' : 's-warn') + '">'
-            + (ok ? 'Good service' : line.active.length + ' alert' + (line.active.length > 1 ? 's' : ''))
-            + '</span></div>';
+            + '<span class="svc-status ' + statusCls + '">' + statusText + '</span></div>';
         });
 
         /* All alerts section */
