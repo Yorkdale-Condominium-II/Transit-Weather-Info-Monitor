@@ -309,6 +309,23 @@
     .go-terminal-name { font-size: clamp(0.7rem, 1.1vh, 0.82rem); font-weight: 700; color: var(--go); }
     .go-terminal-sub { font-size: clamp(0.58rem, 0.85vh, 0.68rem); color: var(--muted); }
 
+    /* TTC body splits into two sub-columns: subway left, bus right */
+    .col-ttc > .sec-body {
+      padding: 0;
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1px;
+      background: var(--border);
+    }
+    .ttc-split-col {
+      background: var(--ttc-dim);
+      padding: clamp(0.5rem, 1.1vh, 1rem);
+      overflow-y: auto;
+      scrollbar-width: none;
+    }
+    .ttc-split-col::-webkit-scrollbar { display: none; }
+
     /* GO Transit body splits into two sub-columns */
     .col-go > .sec-body {
       padding: 0;
@@ -815,7 +832,9 @@
     });
     busHtml += '</div>';
 
-    document.getElementById('ttc-body').innerHTML = subwayHtml + busHtml;
+    document.getElementById('ttc-body').innerHTML =
+      '<div class="ttc-split-col">' + subwayHtml + '</div>'
+      + '<div class="ttc-split-col">' + busHtml + '</div>';
   }
 
   function renderTTCFallback(subwayHtml) {
@@ -854,7 +873,9 @@
       html += '</div>';
     });
     html += '</div>';
-    document.getElementById('ttc-body').innerHTML = subwayHtml + html;
+    document.getElementById('ttc-body').innerHTML =
+      '<div class="ttc-split-col">' + subwayHtml + '</div>'
+      + '<div class="ttc-split-col">' + html + '</div>';
   }
 
   /* ================================================================
