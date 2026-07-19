@@ -18,8 +18,8 @@
       --surface-2:    #1C1C1C;
       --border:       #2A2A2A;
       --text:         #F0F0F0;
-      --muted:        #888888;
-      --dim:          #555555;
+      --muted:        #ACACAC;
+      --dim:          #808080;
 
       --ttc:          #DA251D;
       --ttc-dim:      rgba(218,37,29,0.15);
@@ -110,7 +110,8 @@
     /* ---- Main content ---- */
     .content {
       display: grid;
-      grid-template-columns: 320px 1fr 280px;
+      grid-template-columns: 320px 1fr;
+      grid-template-rows: 55fr 45fr;
       gap: 1px;
       background: var(--border);
       overflow: hidden;
@@ -121,6 +122,10 @@
       flex-direction: column;
       overflow: hidden;
     }
+    /* Column identity — layout placement + brand tint */
+    .col-wx  { grid-row: 1 / 3; background: var(--wx-dim);  }
+    .col-ttc { background: var(--ttc-dim); }
+    .col-go  { background: var(--go-dim);  }
 
 
     /* ================================================================
@@ -343,7 +348,8 @@
     @media (max-width: 1000px) {
       body { overflow: auto; }
       .board { grid-template-rows: 64px auto; height: auto; }
-      .content { grid-template-columns: 1fr; background: var(--bg); }
+      .content { grid-template-columns: 1fr; grid-template-rows: auto; background: var(--bg); }
+      .col-wx { grid-row: auto; }
       .col { overflow: visible; }
       .bus-grid { grid-template-columns: 1fr; }
     }
@@ -384,7 +390,7 @@
   <div class="content">
 
     <!-- ---- LEFT: Weather ---- -->
-    <div class="col">
+    <div class="col col-wx">
       <div class="sec-head">
         <div class="sec-stripe wx-stripe"></div>
         <span class="sec-label">Weather — North York</span>
@@ -394,8 +400,8 @@
       </div>
     </div>
 
-    <!-- ---- CENTRE: TTC ---- -->
-    <div class="col">
+    <!-- ---- TOP-RIGHT: TTC ---- -->
+    <div class="col col-ttc">
       <div class="sec-head">
         <div class="sec-stripe ttc-stripe"></div>
         <span class="sec-label">Toronto Transit Commission</span>
@@ -405,8 +411,8 @@
       </div>
     </div>
 
-    <!-- ---- RIGHT: GO Transit ---- -->
-    <div class="col">
+    <!-- ---- BOTTOM-RIGHT: GO Transit ---- -->
+    <div class="col col-go">
       <div class="sec-head">
         <div class="sec-stripe go-stripe"></div>
         <span class="sec-label">GO Transit</span>
