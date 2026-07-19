@@ -8,8 +8,8 @@
     /* ================================================================
        DESIGN TOKENS
        Background: #0A0A0A  — near-black, optimal for OLED/QLED TVs
-       TTC Red:    #DA291C  — official TTC brand red
-       GO Green:   #00853F  — official GO Transit / Metrolinx green
+       TTC Red:    #DA251D  — official TTC brand red
+       GO Green:   #256C2F  — official GO Transit / Metrolinx green
        Weather:    #2B85C8  — cool sky blue
        ================================================================ */
     :root {
@@ -21,13 +21,13 @@
       --muted:        #888888;
       --dim:          #555555;
 
-      --ttc:          #DA291C;
-      --ttc-dim:      rgba(218,41,28,0.15);
-      --ttc-border:   rgba(218,41,28,0.35);
+      --ttc:          #DA251D;
+      --ttc-dim:      rgba(218,37,29,0.15);
+      --ttc-border:   rgba(218,37,29,0.35);
 
-      --go:           #00853F;
-      --go-dim:       rgba(0,133,63,0.15);
-      --go-border:    rgba(0,133,63,0.35);
+      --go:           #256C2F;
+      --go-dim:       rgba(37,108,47,0.15);
+      --go-border:    rgba(37,108,47,0.35);
 
       --wx:           #2B85C8;
       --wx-dim:       rgba(43,133,200,0.15);
@@ -228,13 +228,20 @@
       font-size: 0.65rem; font-weight: 700; padding: 0.2rem 0.6rem;
       border-radius: 3px; white-space: nowrap; letter-spacing: 0.03em;
     }
-    .l1 { background: #FFD100; color: #000; }
-    .l2 { background: #009A44; color: #fff; }
-    .l3 { background: #003594; color: #fff; }
-    .l4 { background: #9B2893; color: #fff; }
-    .l5 { background: #F18A00; color: #fff; }
-    .l6 { background: #00AEEF; color: #000; }
-    .go-chip { background: var(--go); color: #fff; }
+    .l1 { background: #F8C302; color: #000; }
+    .l2 { background: #16A753; color: #fff; }
+    .l3 { background: #0082C9; color: #fff; }
+    .l4 { background: #B32078; color: #fff; }
+    .l5 { background: #F87005; color: #fff; }
+    .l6 { background: #8A999A; color: #000; }
+    /* GO Transit line chips — each line's official brand colour */
+    .go-br { background: #003768; color: #fff; }
+    .go-le { background: #EE3124; color: #fff; }
+    .go-lw { background: #98002E; color: #fff; }
+    .go-ki { background: #00853F; color: #fff; }
+    .go-st { background: #794400; color: #fff; }
+    .go-rh { background: #009AC7; color: #fff; }
+    .go-mi { background: #F58025; color: #fff; }
     .svc-name { font-size: 0.82rem; color: var(--text); flex: 1; }
     .svc-status { font-size: 0.72rem; font-weight: 600; }
     .s-ok   { color: var(--good); }
@@ -656,13 +663,13 @@
      GO TRANSIT — Train status + Yorkdale GO Bus Terminal
      ================================================================ */
   var GO_TRAIN_LINES = [
-    {code:'BR',  name:'Barrie',         kw:['barrie']},
-    {code:'LE',  name:'Lakeshore East', kw:['lakeshore east']},
-    {code:'LW',  name:'Lakeshore West', kw:['lakeshore west']},
-    {code:'KI',  name:'Kitchener',      kw:['kitchener']},
-    {code:'ST',  name:'Stouffville',    kw:['stouffville']},
-    {code:'RH',  name:'Richmond Hill',  kw:['richmond hill']},
-    {code:'MI',  name:'Milton',         kw:['milton']}
+    {code:'BR',  cls:'go-br', name:'Barrie',         kw:['barrie']},
+    {code:'LE',  cls:'go-le', name:'Lakeshore East', kw:['lakeshore east']},
+    {code:'LW',  cls:'go-lw', name:'Lakeshore West', kw:['lakeshore west']},
+    {code:'KI',  cls:'go-ki', name:'Kitchener',      kw:['kitchener']},
+    {code:'ST',  cls:'go-st', name:'Stouffville',    kw:['stouffville']},
+    {code:'RH',  cls:'go-rh', name:'Richmond Hill',  kw:['richmond hill']},
+    {code:'MI',  cls:'go-mi', name:'Milton',         kw:['milton']}
   ];
 
   function buildGOTrainHtml() {
@@ -670,7 +677,7 @@
     GO_TRAIN_LINES.forEach(function(line) {
       h += '<div class="svc-row">'
         + '<span class="dot d-ok"></span>'
-        + '<span class="line-chip go-chip">' + esc(line.code) + '</span>'
+        + '<span class="line-chip ' + line.cls + '">' + esc(line.code) + '</span>'
         + '<span class="svc-name">' + esc(line.name) + '</span>'
         + '<span class="svc-status s-ok">Good service</span></div>';
     });
@@ -722,7 +729,7 @@
           var ok = !line.active.length;
           html += '<div class="svc-row">'
             + '<span class="dot ' + (ok ? 'd-ok' : 'd-warn') + '"></span>'
-            + '<span class="line-chip go-chip">' + esc(line.code) + '</span>'
+            + '<span class="line-chip ' + line.cls + '">' + esc(line.code) + '</span>'
             + '<span class="svc-name">' + esc(line.name) + '</span>'
             + '<span class="svc-status ' + (ok ? 's-ok' : 's-warn') + '">'
             + (ok ? 'Good service' : line.active.length + ' alert' + (line.active.length > 1 ? 's' : ''))
