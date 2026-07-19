@@ -306,6 +306,23 @@
     .go-terminal-name { font-size: clamp(0.7rem, 1.1vh, 0.82rem); font-weight: 700; color: var(--go); }
     .go-terminal-sub { font-size: clamp(0.58rem, 0.85vh, 0.68rem); color: var(--muted); }
 
+    /* GO Transit body splits into two sub-columns */
+    .col-go > .sec-body {
+      padding: 0;
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1px;
+      background: var(--border);
+    }
+    .go-split-col {
+      background: var(--go-dim);
+      padding: clamp(0.5rem, 1.1vh, 1rem);
+      overflow-y: auto;
+      scrollbar-width: none;
+    }
+    .go-split-col::-webkit-scrollbar { display: none; }
+
     .go-routes { display: flex; flex-direction: column; gap: clamp(0.25rem, 0.6vh, 0.5rem); margin-bottom: clamp(0.4rem, 0.9vh, 1.25rem); }
     .go-card {
       background: var(--surface);
@@ -816,7 +833,13 @@
       {num:'64',  dest:'Newmarket GO',       dir:'↑ Newmarket GO Station',      freq:'Peak service'}
     ];
 
-    var h = '<div class="subway-block" id="go-train-status-block">' + buildGOTrainHtml() + '</div>'
+    /* Left sub-column: GO Train status */
+    var h = '<div class="go-split-col">'
+      + '<div class="subway-block" id="go-train-status-block">' + buildGOTrainHtml() + '</div>'
+      + '</div>';
+
+    /* Right sub-column: Yorkdale GO Bus Terminal + routes */
+    h += '<div class="go-split-col">'
       + '<div class="go-terminal">'
       + '<div class="go-terminal-name">Yorkdale GO Bus Terminal</div>'
       + '<div class="go-terminal-sub">~8 min walk · inside Yorkdale Mall</div>'
@@ -832,7 +855,7 @@
         + '</div></div>';
     });
 
-    h += '</div>';
+    h += '</div></div>';
     document.getElementById('go-body').innerHTML = h;
   }
 
