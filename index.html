@@ -289,6 +289,9 @@
     .bus-dir-name { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--dim); margin-bottom: 0.1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .bus-times { font-family: var(--f-mono); font-size: 0.88rem; font-weight: 600; color: #FF6B5E; font-variant-numeric: tabular-nums; }
     .bus-dist { margin-left: auto; font-size: 0.62rem; color: var(--dim); }
+    .bus-unavail {
+      font-size: 0.65rem; color: var(--warn); padding: 0.35rem 0.5rem 0.6rem;
+    }
 
     /* ================================================================
        GO TRANSIT COLUMN (right)
@@ -679,17 +682,38 @@
   }
 
   /* ================================================================
-     TTC — Subway alerts + Bus predictions (UMO/NextBus)
+     TTC — Subway alerts + Bus predictions
+     retro.umoiq.com (Umo/NextBus legacy) can be intermittently
+     blocked or CORS-restricted; we try three endpoints in sequence:
+       1. Direct (no proxy)
+       2. corsproxy.io
+       3. allorigins.win
+     Stops are discovered once via routeConfig and cached for the
+     whole session — only predictions are re-fetched every 60 s.
      ================================================================ */
-  /* Only routes with stops on or within 250 m of 120 Varna Dr.
-     The distance cap below auto-excludes any route whose nearest stop
-     is further away — so this list can stay broad as a candidate set. */
   var TTC_ROUTES = [
     {tag:'128', name:'Stanley Greene'},
     {tag:'29',  name:'Dufferin'}
   ];
-  var MAX_STOP_DIST = 250; /* metres — beyond this the route doesn't "pass by" */
-  var UMO = 'https://retro.umoiq.com/service/publicXMLFeed?a=ttc';
+  var MAX_STOP_DIST = 250;
+  var UMO_BASE = 'https://retro.umoiq.com/service/publicXMLFeed?a=ttc';
+  var discoveredStops = null; /* set after first successful routeConfig, never cleared */
+
+  function fetchUMO(command) {
+    var full = UMO_BASE + command;
+    var attempts = [
+      full,
+      'https://corsproxy.io/?' + encodeURIComponent(full),
+      'https://api.allorigins.win/raw?url=' + encodeURIComponent(full)
+    ];
+    function tryIdx(i) {
+      if (i >= attempts.length) return Promise.reject(new Error('all endpoints failed'));
+      return fetch(attempts[i])
+        .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+        .catch(function() { return tryIdx(i + 1); });
+    }
+    return tryIdx(0);
+  }
 
   function haversine(lat1,lon1,lat2,lon2) {
     var R=6371000, dLat=(lat2-lat1)*Math.PI/180, dLon=(lon2-lon1)*Math.PI/180;
@@ -699,19 +723,18 @@
 
   function loadTTC() {
     var subwayHtml = buildSubwayHtml();
+    if (discoveredStops) { fetchTTCPredictions(subwayHtml, discoveredStops); return; }
 
-    /* For each route, collect ALL stops within MAX_STOP_DIST (not just nearest) */
+    /* First run: discover all stops within MAX_STOP_DIST via routeConfig */
     var cfgPromises = TTC_ROUTES.map(function(route) {
-      return fetch(UMO + '&command=routeConfig&r=' + route.tag + '&verbose')
-        .then(function(r){ return r.text(); })
+      return fetchUMO('&command=routeConfig&r=' + route.tag + '&verbose')
         .then(function(txt) {
           var xml = new DOMParser().parseFromString(txt,'text/xml');
           var nearby = [];
           xml.querySelectorAll('stop[lat]').forEach(function(s) {
             var d = haversine(LAT,LON,parseFloat(s.getAttribute('lat')),parseFloat(s.getAttribute('lon')));
-            if (d <= MAX_STOP_DIST) {
+            if (d <= MAX_STOP_DIST)
               nearby.push({route:route, stopTag:s.getAttribute('tag'), stopTitle:s.getAttribute('title'), dist:Math.round(d)});
-            }
           });
           return nearby;
         })
@@ -719,7 +742,6 @@
     });
 
     Promise.all(cfgPromises).then(function(results) {
-      /* Flatten; dedupe by route+stopTag */
       var seen = {}, allStops = [];
       results.forEach(function(arr) {
         arr.forEach(function(s) {
@@ -728,15 +750,19 @@
         });
       });
       if (!allStops.length) { renderTTCFallback(subwayHtml); return; }
-
-      var stopsParam = allStops.map(function(v){ return '&stops='+v.route.tag+'|'+v.stopTag; }).join('');
-      return fetch(UMO + '&command=predictionsForMultiStops' + stopsParam)
-        .then(function(r){ return r.text(); })
-        .then(function(txt) {
-          var xml = new DOMParser().parseFromString(txt,'text/xml');
-          renderTTC(subwayHtml, xml, allStops);
-        });
+      discoveredStops = allStops;
+      fetchTTCPredictions(subwayHtml, discoveredStops);
     }).catch(function(){ renderTTCFallback(subwayHtml); });
+  }
+
+  function fetchTTCPredictions(subwayHtml, stops) {
+    var stopsParam = stops.map(function(v){ return '&stops='+v.route.tag+'|'+v.stopTag; }).join('');
+    fetchUMO('&command=predictionsForMultiStops' + stopsParam)
+      .then(function(txt) {
+        var xml = new DOMParser().parseFromString(txt,'text/xml');
+        renderTTC(subwayHtml, xml, stops);
+      })
+      .catch(function(){ renderTTCFallback(subwayHtml); });
   }
 
   function buildSubwayHtml() {
@@ -793,8 +819,42 @@
   }
 
   function renderTTCFallback(subwayHtml) {
-    document.getElementById('ttc-body').innerHTML = subwayHtml
-      + '<div class="state-msg">Bus predictions unavailable — retrying next refresh.</div>';
+    /* Show static route/frequency info while real-time is unavailable */
+    var staticRoutes = [
+      {
+        num: '128', name: 'Stanley Greene',
+        stop: 'Varna Dr at Allen Rd (on-street)',
+        dirs: [
+          {n:'East → Sheppard West Stn',        f:'~12–20 min'},
+          {n:'West → Downsview Park loop',       f:'~12–20 min'}
+        ]
+      },
+      {
+        num: '29', name: 'Dufferin',
+        stop: 'Dufferin St at Wilson Ave (~5 min walk)',
+        dirs: [
+          {n:'South → Dufferin Stn / Exhibition', f:'~5–8 min peak'},
+          {n:'North → Steeles Ave',               f:'~5–8 min peak'}
+        ]
+      }
+    ];
+    var html = '<div class="bus-unavail">⚠ Live predictions unavailable — retrying</div>'
+      + '<div class="bus-grid">';
+    staticRoutes.forEach(function(b) {
+      html += '<div class="bus-card">'
+        + '<div class="bus-head"><span class="bus-num">' + esc(b.num) + '</span>'
+        + '<span class="bus-name">' + esc(b.name) + '</span></div>'
+        + '<div class="bus-stop">' + esc(b.stop) + '</div>';
+      b.dirs.forEach(function(d) {
+        html += '<div class="bus-dir">'
+          + '<div class="bus-dir-name">' + esc(d.n) + '</div>'
+          + '<div class="bus-times" style="color:var(--dim);font-size:0.78rem">' + esc(d.f) + '</div>'
+          + '</div>';
+      });
+      html += '</div>';
+    });
+    html += '</div>';
+    document.getElementById('ttc-body').innerHTML = subwayHtml + html;
   }
 
   /* ================================================================
