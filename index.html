@@ -304,18 +304,23 @@
     .go-dest { font-size: 0.82rem; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .go-freq { font-size: 0.65rem; color: var(--dim); margin-top: 0.05rem; }
 
-    .go-links { display: flex; flex-direction: column; gap: 0.4rem; }
-    .go-link {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 0.55rem 0.75rem;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--r);
-      font-size: 0.75rem; color: var(--muted);
-      transition: border-color 0.15s, color 0.15s;
+    /* Intercity coaches */
+    .ic-card {
+      display: flex; align-items: center; gap: 0.65rem;
+      padding: clamp(0.28rem, 0.7vh, 0.55rem) 0.85rem;
+      border-bottom: 1px solid var(--border);
     }
-    .go-link:hover { border-color: var(--go-border); color: var(--go); }
-    .go-link-arr { color: var(--dim); }
+    .ic-card:last-child { border-bottom: none; }
+    .ic-badge {
+      font-size: 0.58rem; font-weight: 700; letter-spacing: 0.03em;
+      padding: 0.2rem 0.5rem; border-radius: 3px;
+      white-space: nowrap; flex-shrink: 0; text-align: center;
+      min-width: 4.5rem;
+    }
+    .ic-megabus { background: #0066CC; color: #fff; }
+    .ic-on      { background: #006633; color: #fff; }
+    .ic-flix    { background: #73D700; color: #000; }
+    .ic-dest    { font-size: clamp(0.62rem, 0.9vh, 0.72rem); color: var(--muted); line-height: 1.5; }
 
     /* ================================================================
        STATUS DOT
@@ -668,6 +673,24 @@
       {num:'64',  dest:'Newmarket GO',       freq:'Peak service'}
     ];
 
+    var intercity = [
+      {
+        cls:   'ic-megabus',
+        badge: 'Megabus',
+        dests: ['Hamilton · London · Ottawa', 'Montréal · Kingston · Niagara']
+      },
+      {
+        cls:   'ic-on',
+        badge: 'Ont. Northland',
+        dests: ['Barrie · Huntsville · North Bay', 'Sudbury · New Liskeard · Timmins']
+      },
+      {
+        cls:   'ic-flix',
+        badge: 'FlixBus',
+        dests: ['Ottawa · Montréal', 'London · Niagara Falls']
+      }
+    ];
+
     var h = '<div class="subway-block" id="go-train-status-block">' + buildGOTrainHtml() + '</div>'
       + '<div class="go-terminal">'
       + '<div class="go-terminal-name">Yorkdale GO Bus Terminal</div>'
@@ -681,6 +704,18 @@
         + '<div class="go-info"><div class="go-dest">' + esc(r.dest) + '</div><div class="go-freq">' + esc(r.freq) + '</div></div>'
         + '</div>';
     });
+
+    h += '</div>'
+      + '<div class="subway-block">'
+      + '<div class="subway-title">Intercity Coaches — Yorkdale Mall</div>';
+
+    intercity.forEach(function(co) {
+      h += '<div class="ic-card">'
+        + '<span class="ic-badge ' + co.cls + '">' + esc(co.badge) + '</span>'
+        + '<div class="ic-dest">' + co.dests.map(esc).join('<br>') + '</div>'
+        + '</div>';
+    });
+
     h += '</div>';
 
     document.getElementById('go-body').innerHTML = h;
