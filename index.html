@@ -228,7 +228,9 @@
     .go-st { background: #794400; color: #fff; }
     .go-rh { background: #009AC7; color: #fff; }
     .go-mi { background: #F58025; color: #fff; }
-    .svc-name { font-size: clamp(0.7rem, 1.1vh, 0.82rem); color: var(--text); flex: 1; }
+    .svc-name { font-size: clamp(0.7rem, 1.1vh, 0.82rem); color: var(--text); }
+    .svc-sub  { font-size: clamp(0.55rem, 0.75vh, 0.62rem); color: var(--dim); margin-top: 0.1rem; }
+    .svc-info { flex: 1; min-width: 0; }
     .svc-status { font-size: clamp(0.6rem, 0.9vh, 0.72rem); font-weight: 600; }
     .s-ok   { color: var(--good); }
     .s-warn { color: var(--warn); }
@@ -643,13 +645,13 @@
      GO TRANSIT — Train status + Yorkdale GO Bus Terminal
      ================================================================ */
   var GO_TRAIN_LINES = [
-    {code:'BR',  cls:'go-br', name:'Barrie',         kw:['barrie']},
-    {code:'LE',  cls:'go-le', name:'Lakeshore East', kw:['lakeshore east']},
-    {code:'LW',  cls:'go-lw', name:'Lakeshore West', kw:['lakeshore west']},
-    {code:'KI',  cls:'go-ki', name:'Kitchener',      kw:['kitchener']},
-    {code:'ST',  cls:'go-st', name:'Stouffville',    kw:['stouffville']},
-    {code:'RH',  cls:'go-rh', name:'Richmond Hill',  kw:['richmond hill']},
-    {code:'MI',  cls:'go-mi', name:'Milton',         kw:['milton']}
+    {code:'BR', cls:'go-br', name:'Barrie',         dir:'↑ Allandale Waterfront · ↓ Union', freq:'Peak · Mon–Fri',    kw:['barrie']},
+    {code:'LE', cls:'go-le', name:'Lakeshore East', dir:'↑ Oshawa · ↓ Hamilton',            freq:'All day · 7 days', kw:['lakeshore east']},
+    {code:'LW', cls:'go-lw', name:'Lakeshore West', dir:'↑ Niagara Falls · ↓ Oshawa',       freq:'All day · 7 days', kw:['lakeshore west']},
+    {code:'KI', cls:'go-ki', name:'Kitchener',      dir:'↑ Kitchener · ↓ Union',            freq:'Peak · Mon–Fri',    kw:['kitchener']},
+    {code:'ST', cls:'go-st', name:'Stouffville',    dir:'↑ Lincolnville · ↓ Union',         freq:'Peak · Mon–Fri',    kw:['stouffville']},
+    {code:'RH', cls:'go-rh', name:'Richmond Hill',  dir:'↑ Gormley · ↓ Union',              freq:'Peak · Mon–Fri',    kw:['richmond hill']},
+    {code:'MI', cls:'go-mi', name:'Milton',         dir:'↑ Milton · ↓ Union',               freq:'Peak · Mon–Fri',    kw:['milton']}
   ];
 
   function buildGOTrainHtml() {
@@ -658,7 +660,8 @@
       h += '<div class="svc-row">'
         + '<span class="dot d-ok"></span>'
         + '<span class="line-chip ' + line.cls + '">' + esc(line.code) + '</span>'
-        + '<span class="svc-name">' + esc(line.name) + '</span>'
+        + '<div class="svc-info"><div class="svc-name">' + esc(line.name) + '</div>'
+        + '<div class="svc-sub">' + esc(line.dir) + ' &nbsp;·&nbsp; ' + esc(line.freq) + '</div></div>'
         + '<span class="svc-status s-ok">Good service</span></div>';
     });
     return h;
@@ -666,11 +669,11 @@
 
   function renderGO() {
     var busRoutes = [
-      {num:'40',  dest:'Barrie GO Station',  freq:'Peak: every 30 min'},
-      {num:'40A', dest:'Barrie (express)',    freq:'Peak service'},
-      {num:'40C', dest:'Cookstown / Barrie', freq:'Select trips'},
-      {num:'68',  dest:'Bradford / Barrie',  freq:'Peak service'},
-      {num:'64',  dest:'Newmarket GO',       freq:'Peak service'}
+      {num:'40',  dest:'Barrie GO Station',  dir:'↑ Barrie · ↓ Yorkdale',         freq:'Peak: ~30 min'},
+      {num:'40A', dest:'Barrie (express)',    dir:'↑ Barrie · ↓ Yorkdale',         freq:'Peak · express'},
+      {num:'40C', dest:'Cookstown / Barrie', dir:'↑ Cookstown · Barrie',           freq:'Select trips'},
+      {num:'68',  dest:'Bradford / Barrie',  dir:'↑ E. Gwillimbury · Bradford',    freq:'Peak service'},
+      {num:'64',  dest:'Newmarket GO',       dir:'↑ Newmarket GO Station',         freq:'Peak service'}
     ];
 
     var intercity = [
@@ -701,8 +704,10 @@
     busRoutes.forEach(function(r) {
       h += '<div class="go-card">'
         + '<span class="go-num">' + esc(r.num) + '</span>'
-        + '<div class="go-info"><div class="go-dest">' + esc(r.dest) + '</div><div class="go-freq">' + esc(r.freq) + '</div></div>'
-        + '</div>';
+        + '<div class="go-info">'
+        + '<div class="go-dest">' + esc(r.dest) + '</div>'
+        + '<div class="go-freq">' + esc(r.dir) + ' &nbsp;·&nbsp; ' + esc(r.freq) + '</div>'
+        + '</div></div>';
     });
 
     h += '</div>'
@@ -740,7 +745,8 @@
           html += '<div class="svc-row">'
             + '<span class="dot ' + (ok ? 'd-ok' : 'd-warn') + '"></span>'
             + '<span class="line-chip ' + line.cls + '">' + esc(line.code) + '</span>'
-            + '<span class="svc-name">' + esc(line.name) + '</span>'
+            + '<div class="svc-info"><div class="svc-name">' + esc(line.name) + '</div>'
+            + '<div class="svc-sub">' + esc(line.dir) + ' &nbsp;·&nbsp; ' + esc(line.freq) + '</div></div>'
             + '<span class="svc-status ' + (ok ? 's-ok' : 's-warn') + '">'
             + (ok ? 'Good service' : line.active.length + ' alert' + (line.active.length > 1 ? 's' : ''))
             + '</span></div>';
