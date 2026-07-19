@@ -535,12 +535,14 @@
   /* ================================================================
      TTC — Subway alerts + Bus predictions (UMO/NextBus)
      ================================================================ */
+  /* Only routes with stops on or within 250 m of 120 Varna Dr.
+     The distance cap below auto-excludes any route whose nearest stop
+     is further away — so this list can stay broad as a candidate set. */
   var TTC_ROUTES = [
-    {tag:'29',  name:'Dufferin'},
     {tag:'128', name:'Stanley Greene'},
-    {tag:'161', name:'Rogers Rd'},
-    {tag:'196', name:'York U Rocket'}
+    {tag:'29',  name:'Dufferin'}
   ];
+  var MAX_STOP_DIST = 250; /* metres — beyond this the route doesn't "pass by" */
   var UMO = 'https://retro.umoiq.com/service/publicXMLFeed?a=ttc';
 
   function haversine(lat1,lon1,lat2,lon2) {
@@ -553,7 +555,7 @@
     /* Subway status */
     var subwayHtml = buildSubwayHtml();
 
-    /* Bus predictions via UMO */
+    /* Bus predictions via UMO — only keep stops within MAX_STOP_DIST */
     var cfgPromises = TTC_ROUTES.map(function(route) {
       return fetch(UMO + '&command=routeConfig&r=' + route.tag + '&verbose')
         .then(function(r){ return r.text(); })
@@ -565,7 +567,8 @@
             var d = haversine(LAT,LON,parseFloat(s.getAttribute('lat')),parseFloat(s.getAttribute('lon')));
             if (d < bestDist) { bestDist = d; best = s; }
           });
-          return best ? {route:route, stopTag:best.getAttribute('tag'), stopTitle:best.getAttribute('title'), dist:Math.round(bestDist)} : null;
+          if (!best || bestDist > MAX_STOP_DIST) return null;
+          return {route:route, stopTag:best.getAttribute('tag'), stopTitle:best.getAttribute('title'), dist:Math.round(bestDist)};
         })
         .catch(function(){ return null; });
     });
@@ -639,7 +642,7 @@
     var fb = subwayHtml
       + '<div class="state-msg">Live bus predictions unavailable.</div>'
       + '<div style="display:flex;flex-direction:column;gap:0.35rem;margin-top:0.5rem">'
-      + ['29','128','161','196'].map(function(r){
+      + ['128','29'].map(function(r){
           return '<a href="https://www.ttc.ca/route-schedules-and-maps/routes/0'+r+'" target="_blank" class="go-link">'
             + '<span>Route ' + r + ' Schedule</span><span class="go-link-arr">↗</span></a>';
         }).join('')
