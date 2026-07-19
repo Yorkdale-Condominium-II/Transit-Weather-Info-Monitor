@@ -464,7 +464,7 @@
     var now = new Date();
     var cl = document.getElementById('clock');
     var dl = document.getElementById('dateline');
-    if (cl) cl.textContent = now.toLocaleTimeString('en-CA',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+    if (cl) cl.textContent = now.toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit',second:'2-digit',hour12:true});
     if (dl) dl.textContent = now.toLocaleDateString('en-CA',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   }
   tickClock();
@@ -472,7 +472,7 @@
 
   function markUpdated() {
     var el = document.getElementById('updated');
-    if (el) el.textContent = 'Updated ' + new Date().toLocaleTimeString('en-CA',{hour:'2-digit',minute:'2-digit',hour12:false});
+    if (el) el.textContent = 'Updated ' + new Date().toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit',hour12:true});
   }
 
   /* ================================================================
