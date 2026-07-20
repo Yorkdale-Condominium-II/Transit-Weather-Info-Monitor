@@ -124,6 +124,8 @@
     }
     .leaflet-tooltip-top.stop-flag::before    { border-top-color: rgba(16,16,16,0.92); }
     .leaflet-tooltip-bottom.stop-flag::before { border-bottom-color: rgba(16,16,16,0.92); }
+    .leaflet-tooltip-left.stop-flag::before   { border-left-color: rgba(16,16,16,0.92); }
+    .leaflet-tooltip-right.stop-flag::before  { border-right-color: rgba(16,16,16,0.92); }
     .fc-line1 { display: flex; align-items: center; gap: 0.4rem; }
     .fc-chip {
       color: #fff; font-size: 0.62rem; font-weight: 700;
@@ -223,10 +225,15 @@
 (function () {
   'use strict';
 
-  /* 120 Varna Dr / 217 Ranee Ave — SW corner of Ranee Ave & Varna Dr,
-     first corner west of Allen Rd (postal code M6A 0B3) */
-  var LAT = 43.7207, LON = -79.4486;
+  /* 120 Varna Dr / 217 Ranee Ave — corner of Ranee Ave & Varna Dr
+     (M6A 0B3). Fallback estimate only: once TTC route config loads,
+     the home position snaps to the surveyed coordinates of the
+     "Varna Dr at Ranee Ave" stop, which is at the building's corner. */
+  var LAT = 43.7239, LON = -79.4473;
+  var homeCalibrated = false;
   var RADIUS_M = 500;
+
+  var FLAG_H = 38;          /* estimated flag card height, px */
 
   var ROUTES = [
     {tag:'52',  name:'Lawrence West', color:'#F59E0B'},
@@ -265,19 +272,24 @@
     subdomains: 'abcd', maxZoom: 19
   }).addTo(map);
 
-  /* 500 m radius ring */
   var ring = L.circle([LAT, LON], {
     radius: RADIUS_M,
     color: '#ACACAC', weight: 1.5, dashArray: '6 6',
     fill: true, fillColor: '#2B85C8', fillOpacity: 0.05
   }).addTo(map);
-  map.fitBounds(ring.getBounds(), {padding: [24, 24]});
+  map.fitBounds(ring.getBounds(), {padding: [24, 24], animate: false});
 
-  /* Home marker */
-  L.marker([LAT, LON], {
+  var homeMarker = L.marker([LAT, LON], {
     icon: L.divIcon({className:'home-icon', html:'🏠', iconSize:[24,24], iconAnchor:[12,12]}),
     zIndexOffset: 1000
   }).addTo(map).bindPopup('<b>120 Varna Drive</b><br><span class="pp-stop">North York, Toronto · M6A 0B3</span>');
+
+  function moveHome(lat, lon) {
+    LAT = lat; LON = lon;
+    homeMarker.setLatLng([lat, lon]);
+    ring.setLatLng([lat, lon]);
+    map.fitBounds(ring.getBounds(), {padding: [24, 24], animate: false});
+  }
 
   /* ================================================================
      TTC UMO API — same fallback cascade as the main board
@@ -329,10 +341,12 @@
   }
 
   /* ================================================================
-     STOP DISCOVERY — routeConfig per route, stops ≤ 500 m,
-     direction resolved from <direction> stop membership
+     STOP DISCOVERY — routeConfig per route; home self-calibrates to
+     the "Varna Dr at Ranee Ave" stop; stops ≤ 500 m rendered with
+     collision-free flag cards
      ================================================================ */
   var stopLayers = [];
+  var lastResults = null;
 
   function loadStops() {
     var promises = ROUTES.map(function(route) {
@@ -340,36 +354,31 @@
         .then(function(txt) {
           var xml = new DOMParser().parseFromString(txt, 'text/xml');
 
-          /* stopTag → [direction titles] */
-          var dirsByStop = {};
-          var dirEls = Array.prototype.slice.call(xml.querySelectorAll('direction'));
-          var uiDirs = dirEls.filter(function(d){ return d.getAttribute('useForUI') === 'true'; });
-          (uiDirs.length ? uiDirs : dirEls).forEach(function(dir) {
+          /* stopTag → [direction titles]; useForUI preferred, any as fallback */
+          var uiMap = {}, allMap = {};
+          Array.prototype.forEach.call(xml.querySelectorAll('direction'), function(dir) {
             var title = dir.getAttribute('title') || dir.getAttribute('name') || '';
+            var target = dir.getAttribute('useForUI') === 'true' ? uiMap : allMap;
             dir.querySelectorAll('stop').forEach(function(ref) {
               var tag = ref.getAttribute('tag');
-              if (!dirsByStop[tag]) dirsByStop[tag] = [];
-              if (title && dirsByStop[tag].indexOf(title) === -1) dirsByStop[tag].push(title);
+              if (!target[tag]) target[tag] = [];
+              if (title && target[tag].indexOf(title) === -1) target[tag].push(title);
             });
           });
 
-          var nearby = [];
+          var stops = [];
           xml.querySelectorAll('stop[lat]').forEach(function(s) {
-            var slat = parseFloat(s.getAttribute('lat'));
-            var slon = parseFloat(s.getAttribute('lon'));
-            var d = haversine(LAT, LON, slat, slon);
-            if (d <= RADIUS_M) {
-              nearby.push({
-                route: route,
-                stopTag: s.getAttribute('tag'),
-                title: s.getAttribute('title') || '',
-                lat: slat, lon: slon,
-                dist: Math.round(d),
-                dirs: (dirsByStop[s.getAttribute('tag')] || []).map(shortDir)
-              });
-            }
+            var tag = s.getAttribute('tag');
+            stops.push({
+              route: route,
+              stopTag: tag,
+              title: s.getAttribute('title') || '',
+              lat: parseFloat(s.getAttribute('lat')),
+              lon: parseFloat(s.getAttribute('lon')),
+              dirs: (uiMap[tag] || allMap[tag] || []).map(shortDir)
+            });
           });
-          return {route: route, stops: nearby, ok: true};
+          return {route: route, stops: stops, ok: true};
         })
         .catch(function() { return {route: route, stops: [], ok: false}; });
     });
@@ -386,9 +395,35 @@
         return;
       }
 
-      statusEl.className = 'legend-status st-ok';
-      statusEl.textContent = '● Live stop data · TTC route config';
+      /* --- Calibrate home from TTC's own stop coordinates --- */
+      if (!homeCalibrated) {
+        var pin = null, pinAlt = null;
+        results.forEach(function(res) {
+          if (res.route.tag !== '109') return;
+          res.stops.forEach(function(s) {
+            if (/varna\s*dr\.?\s*at\s*ranee/i.test(s.title)) pin = pin || s;
+            else if (/ranee\s*ave\.?\s*at\s*varna/i.test(s.title)) pinAlt = pinAlt || s;
+          });
+        });
+        var anchor = pin || pinAlt;
+        if (anchor) {
+          moveHome(anchor.lat, anchor.lon);
+          homeCalibrated = true;
+        }
+      }
 
+      /* --- Distance filter from (possibly recalibrated) home --- */
+      results.forEach(function(res) {
+        res.stops.forEach(function(s) { s.dist = Math.round(haversine(LAT, LON, s.lat, s.lon)); });
+        res.stops = res.stops.filter(function(s) { return s.dist <= RADIUS_M; });
+      });
+
+      statusEl.className = 'legend-status st-ok';
+      statusEl.textContent = homeCalibrated
+        ? '● Live · home pinned to Ranee & Varna stop'
+        : '● Live stop data · TTC route config';
+
+      lastResults = results;
       renderStops(results);
       renderLegend(results);
     });
@@ -406,49 +441,135 @@
     document.getElementById('legend-rows').innerHTML = h;
   }
 
+  /* ================================================================
+     FLAG LAYOUT — greedy collision avoidance in screen space.
+     Closest stops claim placement first; each card tries a sequence
+     of anchor positions until it finds one that doesn't touch any
+     placed card or marker dot. Distant placements get a dashed
+     leader line back to their stop.
+     ================================================================ */
+  var FLAG_CANDS = [
+    {dir:'top',    off:[0,-10]},  {dir:'bottom', off:[0,10]},
+    {dir:'right',  off:[12,0]},   {dir:'left',   off:[-12,0]},
+    {dir:'right',  off:[14,-32]}, {dir:'left',   off:[-14,-32]},
+    {dir:'right',  off:[14,32]},  {dir:'left',   off:[-14,32]},
+    {dir:'top',    off:[0,-52]},  {dir:'bottom', off:[0,52]},
+    {dir:'right',  off:[16,-72]}, {dir:'left',   off:[-16,-72]},
+    {dir:'top',    off:[0,-94]},  {dir:'bottom', off:[0,94]}
+  ];
+
+  function rectFor(pt, cand, w, h) {
+    var ox = cand.off[0], oy = cand.off[1];
+    if (cand.dir === 'top')    return {x: pt.x+ox-w/2, y: pt.y+oy-h,   w: w, h: h};
+    if (cand.dir === 'bottom') return {x: pt.x+ox-w/2, y: pt.y+oy,     w: w, h: h};
+    if (cand.dir === 'right')  return {x: pt.x+ox,     y: pt.y+oy-h/2, w: w, h: h};
+    return {x: pt.x+ox-w, y: pt.y+oy-h/2, w: w, h: h};
+  }
+
+  function overlapArea(r, placed) {
+    var m = 4; /* minimum clearance so cards never touch */
+    var sum = 0;
+    for (var i = 0; i < placed.length; i++) {
+      var p = placed[i];
+      var ix = Math.min(r.x+r.w+m, p.x+p.w) - Math.max(r.x-m, p.x);
+      var iy = Math.min(r.y+r.h+m, p.y+p.h) - Math.max(r.y-m, p.y);
+      if (ix > 0 && iy > 0) sum += ix * iy;
+    }
+    return sum;
+  }
+
+  function estCardW(line1, line2) {
+    var w1 = 32 + line1.length * 6.3;   /* chip + gap + dir text */
+    var w2 = line2.length * 5.2;
+    return Math.min(Math.max(w1, w2) + 18, 260);
+  }
+
   function renderStops(results) {
-    /* Clear previous layers */
     stopLayers.forEach(function(l){ map.removeLayer(l); });
     stopLayers = [];
 
+    /* Flatten + prep card content */
+    var flat = [];
     results.forEach(function(res) {
-      var route = res.route;
-
       res.stops.forEach(function(s) {
-        var dirText = s.dirs.length ? s.dirs.join(' · ') : 'Direction n/a';
-
-        var marker = L.circleMarker([s.lat, s.lon], {
-          radius: 7,
-          color: '#0A0A0A', weight: 2,
-          fillColor: route.color, fillOpacity: 0.95
-        }).addTo(map);
-
-        /* Always-visible flag card: route + direction + stop + distance.
-           Stops north of home flag upward, south flag downward,
-           so facing pairs at one intersection don't overlap. */
-        var flagDir = s.lat >= LAT ? 'top' : 'bottom';
-        marker.bindTooltip(
-          '<div class="fc-line1">'
-          + '<span class="fc-chip" style="background:' + route.color + '">' + esc(route.tag) + '</span>'
-          + '<span class="fc-dir">' + esc(trunc(dirText, 30)) + '</span>'
-          + '</div>'
-          + '<div class="fc-line2">' + esc(trunc(s.title, 34)) + ' · ' + s.dist + ' m</div>',
-          {permanent: true, direction: flagDir, offset: [0, flagDir === 'top' ? -8 : 8],
-           className: 'stop-flag', opacity: 1}
-        );
-
-        /* Click popup with untruncated details */
-        marker.bindPopup(
-          '<span class="pp-route" style="background:' + route.color + '">' + esc(route.tag) + ' ' + esc(route.name) + '</span><br>'
-          + '<span class="pp-dir">' + esc(dirText) + '</span><br>'
-          + '<span class="pp-stop">' + esc(s.title) + '</span><br>'
-          + '<span class="pp-dist">' + s.dist + ' m from home</span>'
-        );
-
-        stopLayers.push(marker);
+        s.color = res.route.color;
+        s.dirText = s.dirs.length ? s.dirs.join(' · ') : 'Direction n/a';
+        s.line1 = trunc(s.dirText, 30);
+        s.line2 = trunc(s.title, 34) + ' · ' + s.dist + ' m';
+        s.cardW = estCardW(s.line1, s.line2);
+        flat.push(s);
       });
     });
+
+    /* Obstacles: every marker dot + the home icon */
+    var placed = [];
+    flat.forEach(function(s) {
+      s.pt = map.latLngToContainerPoint([s.lat, s.lon]);
+      placed.push({x: s.pt.x-8, y: s.pt.y-8, w: 16, h: 16});
+    });
+    var hp = map.latLngToContainerPoint([LAT, LON]);
+    placed.push({x: hp.x-13, y: hp.y-13, w: 26, h: 26});
+
+    /* Greedy placement, closest stop first */
+    flat.slice().sort(function(a,b){ return a.dist - b.dist; }).forEach(function(s) {
+      var best = null, bestArea = Infinity;
+      for (var i = 0; i < FLAG_CANDS.length; i++) {
+        var r = rectFor(s.pt, FLAG_CANDS[i], s.cardW, FLAG_H);
+        var a = overlapArea(r, placed);
+        if (a === 0) { best = FLAG_CANDS[i]; break; }
+        if (a < bestArea) { bestArea = a; best = FLAG_CANDS[i]; }
+      }
+      s.flag = best;
+      placed.push(rectFor(s.pt, best, s.cardW, FLAG_H));
+    });
+
+    /* Draw markers, flags, leader lines, popups */
+    flat.forEach(function(s) {
+      var marker = L.circleMarker([s.lat, s.lon], {
+        radius: 7,
+        color: '#0A0A0A', weight: 2,
+        fillColor: s.color, fillOpacity: 0.95
+      }).addTo(map);
+
+      marker.bindTooltip(
+        '<div class="fc-line1">'
+        + '<span class="fc-chip" style="background:' + s.color + '">' + esc(s.route.tag) + '</span>'
+        + '<span class="fc-dir">' + esc(s.line1) + '</span>'
+        + '</div>'
+        + '<div class="fc-line2">' + esc(s.line2) + '</div>',
+        {permanent: true, direction: s.flag.dir, offset: s.flag.off,
+         className: 'stop-flag', opacity: 1}
+      );
+
+      marker.bindPopup(
+        '<span class="pp-route" style="background:' + s.color + '">' + esc(s.route.tag) + ' ' + esc(s.route.name) + '</span><br>'
+        + '<span class="pp-dir">' + esc(s.dirText) + '</span><br>'
+        + '<span class="pp-stop">' + esc(s.title) + '</span><br>'
+        + '<span class="pp-dist">' + s.dist + ' m from home</span>'
+      );
+
+      stopLayers.push(marker);
+
+      /* Leader line when the card sits away from its dot */
+      var ox = s.flag.off[0], oy = s.flag.off[1];
+      if (Math.abs(ox) + Math.abs(oy) > 26) {
+        var line = L.polyline([
+          [s.lat, s.lon],
+          map.containerPointToLatLng([s.pt.x + ox, s.pt.y + oy])
+        ], {color: 'rgba(172,172,172,0.55)', weight: 1, dashArray: '2 3', interactive: false});
+        line.addTo(map);
+        stopLayers.push(line);
+      }
+    });
   }
+
+  /* Re-run layout when zoom changes (marker spacing changes) */
+  var relayoutTimer = null;
+  map.on('zoomend', function() {
+    if (!lastResults) return;
+    clearTimeout(relayoutTimer);
+    relayoutTimer = setTimeout(function(){ renderStops(lastResults); }, 120);
+  });
 
   loadStops();
 

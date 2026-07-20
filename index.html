@@ -516,8 +516,11 @@
 (function () {
   'use strict';
 
-  /* 120 Varna Dr / 217 Ranee Ave — SW corner of Ranee Ave & Varna Dr (M6A 0B3) */
-  var LAT = 43.7207, LON = -79.4486;
+  /* 120 Varna Dr / 217 Ranee Ave — corner of Ranee Ave & Varna Dr
+     (M6A 0B3). Fallback estimate only: loadTTC() snaps home to the
+     TTC "Varna Dr at Ranee Ave" stop coordinates once route config
+     loads, so distances are measured from the building's corner. */
+  var LAT = 43.7239, LON = -79.4473;
 
   /* ================================================================
      UNION STATION TIMING
@@ -760,27 +763,41 @@
     var subwayHtml = buildSubwayHtml();
     if (discoveredStops) { fetchTTCPredictions(subwayHtml, discoveredStops); return; }
 
-    /* First run: discover all stops within MAX_STOP_DIST via routeConfig */
+    /* First run: fetch full stop lists via routeConfig */
     var cfgPromises = TTC_ROUTES.map(function(route) {
       return fetchUMO('&command=routeConfig&r=' + route.tag + '&verbose')
         .then(function(txt) {
           var xml = new DOMParser().parseFromString(txt,'text/xml');
-          var nearby = [];
+          var all = [];
           xml.querySelectorAll('stop[lat]').forEach(function(s) {
-            var d = haversine(LAT,LON,parseFloat(s.getAttribute('lat')),parseFloat(s.getAttribute('lon')));
-            if (d <= MAX_STOP_DIST)
-              nearby.push({route:route, stopTag:s.getAttribute('tag'), stopTitle:s.getAttribute('title'), dist:Math.round(d)});
+            all.push({route:route, stopTag:s.getAttribute('tag'), stopTitle:s.getAttribute('title')||'',
+                      lat:parseFloat(s.getAttribute('lat')), lon:parseFloat(s.getAttribute('lon'))});
           });
-          return nearby;
+          return all;
         })
         .catch(function(){ return []; });
     });
 
     Promise.all(cfgPromises).then(function(results) {
-      /* Keep only the nearest stop per route to avoid duplicate cards */
+      /* Snap home to TTC's surveyed coordinates for the stop at the
+         building's corner (Varna Dr at Ranee Ave) */
+      var pin = null, pinAlt = null;
+      results.forEach(function(arr) {
+        arr.forEach(function(s) {
+          if (s.route.tag !== '109') return;
+          if (/varna\s*dr\.?\s*at\s*ranee/i.test(s.stopTitle)) pin = pin || s;
+          else if (/ranee\s*ave\.?\s*at\s*varna/i.test(s.stopTitle)) pinAlt = pinAlt || s;
+        });
+      });
+      var anchor = pin || pinAlt;
+      if (anchor) { LAT = anchor.lat; LON = anchor.lon; }
+
+      /* Keep only the nearest in-range stop per route to avoid duplicates */
       var nearest = {};
       results.forEach(function(arr) {
         arr.forEach(function(s) {
+          s.dist = Math.round(haversine(LAT, LON, s.lat, s.lon));
+          if (s.dist > MAX_STOP_DIST) return;
           if (!nearest[s.route.tag] || s.dist < nearest[s.route.tag].dist) {
             nearest[s.route.tag] = s;
           }
