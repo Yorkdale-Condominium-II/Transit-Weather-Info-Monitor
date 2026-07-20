@@ -200,7 +200,7 @@
     <div class="bar-left">
       <span class="bar-logo">120 Varna Drive</span>
       <span class="bar-sep"></span>
-      <span class="bar-location">Bus Stop Map — 500 m radius</span>
+      <span class="bar-location">Bus Stop Map — 150 m radius</span>
     </div>
     <div>
       <div class="bar-clock" id="clock">—:——</div>
@@ -215,7 +215,7 @@
     <div id="map"></div>
 
     <div class="legend">
-      <div class="legend-head">Bus Stops · 500 m</div>
+      <div class="legend-head">Bus Stops · 150 m</div>
       <div id="legend-rows"></div>
       <div class="legend-status st-warn" id="status">Loading stop data…</div>
       <div class="legend-hint">Click a stop for full details</div>
@@ -236,7 +236,7 @@
      "Varna Dr at Ranee Ave" stop, which is at the building's corner. */
   var LAT = 43.7239, LON = -79.4473;
   var homeCalibrated = false;
-  var RADIUS_M = 500;
+  var RADIUS_M = 150;
 
   var FLAG_H = 50;          /* estimated flag card height, px (matches larger card text) */
 
@@ -370,7 +370,7 @@
 
   /* ================================================================
      STOP DISCOVERY — routeConfig per route; home self-calibrates to
-     the "Varna Dr at Ranee Ave" stop; stops ≤ 500 m rendered with
+     the "Varna Dr at Ranee Ave" stop; stops ≤ 150 m rendered with
      collision-free flag cards
      ================================================================ */
   var stopLayers = [];
