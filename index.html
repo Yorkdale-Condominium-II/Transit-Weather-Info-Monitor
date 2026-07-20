@@ -776,15 +776,19 @@
     });
 
     Promise.all(cfgPromises).then(function(results) {
-      var seen = {}, allStops = [];
+      /* Keep only the nearest stop per route to avoid duplicate cards */
+      var nearest = {};
       results.forEach(function(arr) {
         arr.forEach(function(s) {
-          var key = s.route.tag + '|' + s.stopTag;
-          if (!seen[key]) { seen[key] = true; allStops.push(s); }
+          if (!nearest[s.route.tag] || s.dist < nearest[s.route.tag].dist) {
+            nearest[s.route.tag] = s;
+          }
         });
       });
-      if (!allStops.length) { renderTTCFallback(subwayHtml); return; }
-      discoveredStops = allStops;
+      var uniqueStops = [];
+      Object.keys(nearest).forEach(function(k){ uniqueStops.push(nearest[k]); });
+      if (!uniqueStops.length) { renderTTCFallback(subwayHtml); return; }
+      discoveredStops = uniqueStops;
       fetchTTCPredictions(subwayHtml, discoveredStops);
     }).catch(function(){ renderTTCFallback(subwayHtml); });
   }
