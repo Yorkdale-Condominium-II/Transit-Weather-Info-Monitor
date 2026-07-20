@@ -291,8 +291,8 @@
      ================================================================ */
   var map = L.map('map', {
     zoomControl: true,
-    zoomSnap: 0.25,   /* fitBounds can settle on a fractional zoom → ring fills the screen tightly */
-    zoomDelta: 0.5    /* smaller +/- button increment */
+    zoomSnap: 0.25,    /* fitBounds can settle on a fractional zoom → ring fills the screen tightly */
+    zoomDelta: 0.25    /* fine +/- button increment (quarter-level per click) */
   }).setView([LAT, LON], 16);
 
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
