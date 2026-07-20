@@ -24,10 +24,6 @@
       --warn:         #F59E0B;
       --bad:          #EF4444;
 
-      --r52:          #F59E0B;   /* 52 Lawrence West — amber   */
-      --r109:         #3B82F6;   /* 109 Ranee        — blue    */
-      --r29:          #22C55E;   /* 29 Dufferin      — green   */
-
       --r:            6px;
       --f-sans:       'Segoe UI', system-ui, -apple-system, sans-serif;
       --f-mono:       'Consolas', 'SF Mono', 'Fira Code', monospace;
@@ -116,6 +112,27 @@
       filter: drop-shadow(0 0 4px rgba(0,0,0,0.9));
     }
 
+    /* ---- Flag cards (permanent tooltips at each stop) ---- */
+    .leaflet-tooltip.stop-flag {
+      background: rgba(16,16,16,0.92);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.65);
+      padding: 0.3rem 0.5rem;
+      color: var(--text);
+      white-space: nowrap;
+    }
+    .leaflet-tooltip-top.stop-flag::before    { border-top-color: rgba(16,16,16,0.92); }
+    .leaflet-tooltip-bottom.stop-flag::before { border-bottom-color: rgba(16,16,16,0.92); }
+    .fc-line1 { display: flex; align-items: center; gap: 0.4rem; }
+    .fc-chip {
+      color: #fff; font-size: 0.62rem; font-weight: 700;
+      padding: 0.08rem 0.4rem; border-radius: 3px;
+      font-variant-numeric: tabular-nums;
+    }
+    .fc-dir  { font-size: 0.66rem; font-weight: 600; }
+    .fc-line2 { font-size: 0.56rem; color: var(--muted); margin-top: 0.15rem; }
+
     /* Popup bits */
     .pp-route {
       display: inline-block; color: #fff; font-weight: 700;
@@ -126,72 +143,41 @@
     .pp-stop { color: var(--muted); }
     .pp-dist { color: var(--dim); font-family: var(--f-mono); font-size: 0.7rem; }
 
-    /* ---- Side panel ---- */
-    .panel {
-      position: absolute; top: 1rem; right: 1rem; z-index: 1100;
-      width: 330px; max-height: calc(100% - 2rem);
-      display: flex; flex-direction: column;
-      background: rgba(20,20,20,0.92);
+    /* ---- Compact legend (bottom-left) ---- */
+    .legend {
+      position: absolute; left: 1rem; bottom: 1.5rem; z-index: 1100;
+      background: rgba(20,20,20,0.9);
       border: 1px solid var(--border);
       border-radius: var(--r);
-      overflow: hidden;
+      padding: 0.55rem 0.8rem;
       backdrop-filter: blur(4px);
+      min-width: 190px;
     }
-    .panel-head {
-      padding: 0.6rem 0.9rem;
-      border-bottom: 1px solid var(--border);
-      background: var(--surface-2);
+    .legend-head {
+      font-size: 0.6rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.09em; color: var(--muted);
+      margin-bottom: 0.4rem;
     }
-    .panel-title {
-      font-size: 0.65rem; font-weight: 700; text-transform: uppercase;
-      letter-spacing: 0.1em; color: var(--muted);
+    .lg-row {
+      display: flex; align-items: center; gap: 0.45rem;
+      font-size: 0.7rem; color: var(--text);
+      padding: 0.12rem 0;
     }
-    .panel-sub { font-size: 0.62rem; color: var(--dim); margin-top: 0.15rem; }
-    .panel-body { overflow-y: auto; scrollbar-width: none; }
-    .panel-body::-webkit-scrollbar { display: none; }
-
-    .status-line {
-      padding: 0.45rem 0.9rem; font-size: 0.65rem;
-      border-bottom: 1px solid var(--border);
+    .lg-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; border: 2px solid #0A0A0A; }
+    .lg-count { margin-left: auto; font-family: var(--f-mono); font-size: 0.62rem; color: var(--dim); }
+    .legend-status {
+      margin-top: 0.4rem; padding-top: 0.4rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.6rem;
     }
     .st-ok   { color: var(--good); }
     .st-warn { color: var(--warn); }
-
-    .route-group { border-bottom: 1px solid var(--border); }
-    .route-group:last-child { border-bottom: none; }
-    .route-head {
-      display: flex; align-items: center; gap: 0.5rem;
-      padding: 0.5rem 0.9rem;
-      background: rgba(255,255,255,0.03);
-    }
-    .route-chip {
-      color: #fff; font-size: 0.72rem; font-weight: 700;
-      padding: 0.15rem 0.5rem; border-radius: 3px;
-      font-variant-numeric: tabular-nums;
-    }
-    .route-name { font-size: 0.78rem; font-weight: 600; color: var(--text); }
-    .route-count { margin-left: auto; font-size: 0.62rem; color: var(--dim); font-family: var(--f-mono); }
-
-    .stop-row {
-      display: flex; align-items: baseline; gap: 0.5rem;
-      padding: 0.4rem 0.9rem 0.4rem 1.2rem;
-      border-top: 1px solid rgba(42,42,42,0.6);
-      cursor: pointer;
-    }
-    .stop-row:hover { background: rgba(255,255,255,0.05); }
-    .stop-info { flex: 1; min-width: 0; }
-    .stop-dir  { font-size: 0.7rem; font-weight: 600; color: var(--text); }
-    .stop-name { font-size: 0.62rem; color: var(--dim); margin-top: 0.05rem; }
-    .stop-dist { font-size: 0.65rem; color: var(--muted); font-family: var(--f-mono); white-space: nowrap; font-variant-numeric: tabular-nums; }
-    .no-stops  { padding: 0.4rem 0.9rem 0.5rem 1.2rem; font-size: 0.65rem; color: var(--dim); font-style: italic; }
+    .legend-hint { font-size: 0.55rem; color: var(--dim); margin-top: 0.2rem; }
 
     @media (max-width: 700px) {
-      .panel {
-        left: 0.5rem; right: 0.5rem; top: auto; bottom: 0.5rem;
-        width: auto; max-height: 45%;
-      }
       .bar { padding: 0 1rem; }
       .bar-clock { font-size: 1.4rem; }
+      .legend { left: 0.5rem; bottom: 1.25rem; }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -221,13 +207,11 @@
   <div class="map-wrap">
     <div id="map"></div>
 
-    <div class="panel">
-      <div class="panel-head">
-        <div class="panel-title">Nearby Bus Stops</div>
-        <div class="panel-sub">TTC stops within 500 m · tap a stop to locate it</div>
-      </div>
-      <div class="status-line st-warn" id="status">Loading stop data…</div>
-      <div class="panel-body" id="stop-list"></div>
+    <div class="legend">
+      <div class="legend-head">Bus Stops · 500 m</div>
+      <div id="legend-rows"></div>
+      <div class="legend-status st-warn" id="status">Loading stop data…</div>
+      <div class="legend-hint">Click a stop for full details</div>
     </div>
   </div>
 
@@ -239,7 +223,9 @@
 (function () {
   'use strict';
 
-  var LAT = 43.722, LON = -79.444;
+  /* 120 Varna Dr / 217 Ranee Ave — SW corner of Ranee Ave & Varna Dr,
+     first corner west of Allen Rd (postal code M6A 0B3) */
+  var LAT = 43.7207, LON = -79.4486;
   var RADIUS_M = 500;
 
   var ROUTES = [
@@ -250,6 +236,10 @@
 
   function esc(s) {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function trunc(s, n) {
+    s = String(s);
+    return s.length > n ? s.slice(0, n - 1) + '…' : s;
   }
 
   /* ================================================================
@@ -276,17 +266,18 @@
   }).addTo(map);
 
   /* 500 m radius ring */
-  L.circle([LAT, LON], {
+  var ring = L.circle([LAT, LON], {
     radius: RADIUS_M,
     color: '#ACACAC', weight: 1.5, dashArray: '6 6',
     fill: true, fillColor: '#2B85C8', fillOpacity: 0.05
   }).addTo(map);
+  map.fitBounds(ring.getBounds(), {padding: [24, 24]});
 
   /* Home marker */
   L.marker([LAT, LON], {
     icon: L.divIcon({className:'home-icon', html:'🏠', iconSize:[24,24], iconAnchor:[12,12]}),
     zIndexOffset: 1000
-  }).addTo(map).bindPopup('<b>120 Varna Drive</b><br><span class="pp-stop">North York, Toronto</span>');
+  }).addTo(map).bindPopup('<b>120 Varna Drive</b><br><span class="pp-stop">North York, Toronto · M6A 0B3</span>');
 
   /* ================================================================
      TTC UMO API — same fallback cascade as the main board
@@ -329,17 +320,19 @@
     return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
   }
 
-  /* "East - 52 Lawrence West towards Lawrence Station" → "East → Lawrence Station" */
+  /* "East - 52 Lawrence West towards Lawrence Station"
+       → "East → Lawrence Stn" */
   function shortDir(t) {
     var m = String(t).match(/^(\w+)\s*-\s*.*?towards\s+(.+)$/i);
-    return m ? m[1] + ' → ' + m[2] : String(t);
+    var out = m ? m[1] + ' → ' + m[2] : String(t);
+    return out.replace(/\bStation\b/gi, 'Stn');
   }
 
   /* ================================================================
      STOP DISCOVERY — routeConfig per route, stops ≤ 500 m,
      direction resolved from <direction> stop membership
      ================================================================ */
-  var stopMarkers = {};   /* key route|stopTag → Leaflet marker */
+  var stopLayers = [];
 
   function loadStops() {
     var promises = ROUTES.map(function(route) {
@@ -386,81 +379,73 @@
       var statusEl = document.getElementById('status');
 
       if (!anyOk) {
-        statusEl.className = 'status-line st-warn';
-        statusEl.textContent = '⚠ Live stop data unavailable — retrying in 60 s';
+        statusEl.className = 'legend-status st-warn';
+        statusEl.textContent = '⚠ Stop data unavailable — retrying in 60 s';
+        renderLegend(results);
         setTimeout(loadStops, 60000);
         return;
       }
 
-      statusEl.className = 'status-line st-ok';
+      statusEl.className = 'legend-status st-ok';
       statusEl.textContent = '● Live stop data · TTC route config';
 
       renderStops(results);
+      renderLegend(results);
     });
   }
 
-  function renderStops(results) {
-    /* Clear previous markers */
-    Object.keys(stopMarkers).forEach(function(k){ map.removeLayer(stopMarkers[k]); });
-    stopMarkers = {};
+  function renderLegend(results) {
+    var h = '';
+    results.forEach(function(res) {
+      h += '<div class="lg-row">'
+        + '<span class="lg-dot" style="background:' + res.route.color + '"></span>'
+        + esc(res.route.tag) + ' ' + esc(res.route.name)
+        + '<span class="lg-count">' + (res.ok ? res.stops.length : '—') + '</span>'
+        + '</div>';
+    });
+    document.getElementById('legend-rows').innerHTML = h;
+  }
 
-    var listHtml = '';
+  function renderStops(results) {
+    /* Clear previous layers */
+    stopLayers.forEach(function(l){ map.removeLayer(l); });
+    stopLayers = [];
 
     results.forEach(function(res) {
       var route = res.route;
-      var stops = res.stops.slice().sort(function(a,b){ return a.dist - b.dist; });
 
-      listHtml += '<div class="route-group">'
-        + '<div class="route-head">'
-        + '<span class="route-chip" style="background:' + route.color + '">' + esc(route.tag) + '</span>'
-        + '<span class="route-name">' + esc(route.name) + '</span>'
-        + '<span class="route-count">' + stops.length + ' stop' + (stops.length === 1 ? '' : 's') + '</span>'
-        + '</div>';
-
-      if (!stops.length) {
-        listHtml += '<div class="no-stops">'
-          + (res.ok ? 'No stops within ' + RADIUS_M + ' m' : 'Route data unavailable')
-          + '</div>';
-      }
-
-      stops.forEach(function(s) {
-        var key = route.tag + '|' + s.stopTag;
+      res.stops.forEach(function(s) {
         var dirText = s.dirs.length ? s.dirs.join(' · ') : 'Direction n/a';
 
-        /* Map marker */
         var marker = L.circleMarker([s.lat, s.lon], {
-          radius: 8,
+          radius: 7,
           color: '#0A0A0A', weight: 2,
           fillColor: route.color, fillOpacity: 0.95
-        }).addTo(map).bindPopup(
+        }).addTo(map);
+
+        /* Always-visible flag card: route + direction + stop + distance.
+           Stops north of home flag upward, south flag downward,
+           so facing pairs at one intersection don't overlap. */
+        var flagDir = s.lat >= LAT ? 'top' : 'bottom';
+        marker.bindTooltip(
+          '<div class="fc-line1">'
+          + '<span class="fc-chip" style="background:' + route.color + '">' + esc(route.tag) + '</span>'
+          + '<span class="fc-dir">' + esc(trunc(dirText, 30)) + '</span>'
+          + '</div>'
+          + '<div class="fc-line2">' + esc(trunc(s.title, 34)) + ' · ' + s.dist + ' m</div>',
+          {permanent: true, direction: flagDir, offset: [0, flagDir === 'top' ? -8 : 8],
+           className: 'stop-flag', opacity: 1}
+        );
+
+        /* Click popup with untruncated details */
+        marker.bindPopup(
           '<span class="pp-route" style="background:' + route.color + '">' + esc(route.tag) + ' ' + esc(route.name) + '</span><br>'
           + '<span class="pp-dir">' + esc(dirText) + '</span><br>'
           + '<span class="pp-stop">' + esc(s.title) + '</span><br>'
           + '<span class="pp-dist">' + s.dist + ' m from home</span>'
         );
-        stopMarkers[key] = marker;
 
-        /* Panel row */
-        listHtml += '<div class="stop-row" data-key="' + esc(key) + '">'
-          + '<div class="stop-info">'
-          + '<div class="stop-dir" style="color:' + route.color + '">' + esc(dirText) + '</div>'
-          + '<div class="stop-name">' + esc(s.title) + '</div>'
-          + '</div>'
-          + '<span class="stop-dist">' + s.dist + ' m</span>'
-          + '</div>';
-      });
-
-      listHtml += '</div>';
-    });
-
-    var listEl = document.getElementById('stop-list');
-    listEl.innerHTML = listHtml;
-
-    /* Click a row → pan + open popup */
-    listEl.querySelectorAll('.stop-row').forEach(function(row) {
-      row.addEventListener('click', function() {
-        var m = stopMarkers[row.getAttribute('data-key')];
-        if (m) { map.panTo(m.getLatLng()); m.openPopup(); }
+        stopLayers.push(marker);
       });
     });
   }
