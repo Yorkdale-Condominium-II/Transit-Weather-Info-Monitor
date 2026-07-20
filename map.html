@@ -160,6 +160,22 @@
       letter-spacing: 0.09em; color: var(--muted);
       margin-bottom: 0.45rem;
     }
+    /* Radius selector buttons */
+    .radius-ctrl { display: flex; gap: 4px; margin-bottom: 0.55rem; }
+    .radius-btn {
+      flex: 1; text-align: center; cursor: pointer;
+      font-family: var(--f-sans);
+      font-size: 0.68rem; font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      padding: 0.28rem 0; border-radius: 4px;
+      background: var(--surface-2); color: var(--muted);
+      border: 1px solid var(--border);
+      transition: background 0.12s, color 0.12s, border-color 0.12s;
+    }
+    .radius-btn:hover { color: var(--text); border-color: var(--dim); }
+    .radius-btn.active {
+      background: #2B85C8; color: #fff; border-color: #2B85C8;
+    }
     .lg-row {
       display: flex; align-items: center; gap: 0.5rem;
       font-size: 0.78rem; color: var(--text);
@@ -200,7 +216,7 @@
     <div class="bar-left">
       <span class="bar-logo">120 Varna Drive</span>
       <span class="bar-sep"></span>
-      <span class="bar-location">Bus Stop Map — 150 m radius</span>
+      <span class="bar-location" id="radius-label">Bus Stop Map — 150 m radius</span>
     </div>
     <div>
       <div class="bar-clock" id="clock">—:——</div>
@@ -215,7 +231,8 @@
     <div id="map"></div>
 
     <div class="legend">
-      <div class="legend-head">Bus Stops · 150 m</div>
+      <div class="legend-head" id="legend-head">Bus Stops · 150 m</div>
+      <div class="radius-ctrl" id="radius-ctrl"></div>
       <div id="legend-rows"></div>
       <div class="legend-status st-warn" id="status">Loading stop data…</div>
       <div class="legend-hint">Click a stop for full details</div>
@@ -237,6 +254,7 @@
   var LAT = 43.7239, LON = -79.4473;
   var homeCalibrated = false;
   var RADIUS_M = 150;
+  var RADIUS_PRESETS = [150, 250, 500, 800];   /* selectable via legend buttons */
 
   var FLAG_H = 50;          /* estimated flag card height, px (matches larger card text) */
 
@@ -374,7 +392,8 @@
      collision-free flag cards
      ================================================================ */
   var stopLayers = [];
-  var lastResults = null;
+  var lastResults = null;   /* radius-filtered results currently drawn */
+  var rawResults = null;    /* full stop lists (all distances) for re-filtering */
 
   function loadStops() {
     var promises = ROUTES.map(function(route) {
@@ -440,20 +459,65 @@
         }
       }
 
-      /* --- Distance filter from (possibly recalibrated) home --- */
-      results.forEach(function(res) {
-        res.stops.forEach(function(s) { s.dist = Math.round(haversine(LAT, LON, s.lat, s.lon)); });
-        res.stops = res.stops.filter(function(s) { return s.dist <= RADIUS_M; });
-      });
-
       statusEl.className = 'legend-status st-ok';
       statusEl.textContent = homeCalibrated
         ? '● Live · home pinned to Ranee & Varna stop'
         : '● Live stop data · TTC route config';
 
-      lastResults = results;
-      renderStops(results);
-      renderLegend(results);
+      /* Keep the full stop lists; draw at the current radius */
+      rawResults = results;
+      applyRadius();
+    });
+  }
+
+  /* ================================================================
+     RADIUS CONTROL — re-filter the cached stop lists to the chosen
+     radius without re-fetching, and redraw ring, zoom, and flags
+     ================================================================ */
+  function applyRadius() {
+    if (!rawResults) return;
+    var filtered = rawResults.map(function(res) {
+      var stops = res.stops.filter(function(s) {
+        s.dist = Math.round(haversine(LAT, LON, s.lat, s.lon));
+        return s.dist <= RADIUS_M;
+      });
+      return {route: res.route, stops: stops, ok: res.ok};
+    });
+    lastResults = filtered;
+    renderStops(filtered);
+    renderLegend(filtered);
+  }
+
+  function updateRadiusUI() {
+    var head = document.getElementById('legend-head');
+    if (head) head.textContent = 'Bus Stops · ' + RADIUS_M + ' m';
+    var label = document.getElementById('radius-label');
+    if (label) label.textContent = 'Bus Stop Map — ' + RADIUS_M + ' m radius';
+    Array.prototype.forEach.call(document.querySelectorAll('.radius-btn'), function(btn) {
+      btn.classList.toggle('active', parseInt(btn.getAttribute('data-m'), 10) === RADIUS_M);
+    });
+  }
+
+  function setRadius(m) {
+    if (m === RADIUS_M) return;
+    RADIUS_M = m;
+    ring.setRadius(m);
+    map.fitBounds(ring.getBounds(), {padding: [24, 24], animate: false});
+    updateRadiusUI();
+    applyRadius();   /* renders once the map settles at the new zoom */
+  }
+
+  function buildRadiusControl() {
+    var el = document.getElementById('radius-ctrl');
+    if (!el) return;
+    el.innerHTML = RADIUS_PRESETS.map(function(m) {
+      return '<button type="button" class="radius-btn' + (m === RADIUS_M ? ' active' : '')
+        + '" data-m="' + m + '">' + m + '</button>';
+    }).join('');
+    Array.prototype.forEach.call(el.querySelectorAll('.radius-btn'), function(btn) {
+      btn.addEventListener('click', function() {
+        setRadius(parseInt(btn.getAttribute('data-m'), 10));
+      });
     });
   }
 
@@ -621,6 +685,7 @@
     relayoutTimer = setTimeout(function(){ renderStops(lastResults); }, 120);
   });
 
+  buildRadiusControl();
   loadStops();
 
 })();
