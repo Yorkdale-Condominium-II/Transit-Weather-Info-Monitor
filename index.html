@@ -701,33 +701,49 @@
 
   /* ================================================================
      TTC — Subway alerts + Bus predictions
-     retro.umoiq.com (Umo/NextBus legacy) can be intermittently
-     blocked or CORS-restricted; we try three endpoints in sequence:
-       1. Direct (no proxy)
-       2. corsproxy.io
-       3. allorigins.win
+     retro.umoiq.com (Umo/NextBus legacy) is deprecated and often
+     CORS-restricted. We try both domains and multiple CORS proxies:
+       Base URLs: retro.umoiq.com, umoiq.com
+       Proxies:   corsproxy.io, allorigins.win, codetabs.com,
+                  thingproxy.freeboard.io
      Stops are discovered once via routeConfig and cached for the
      whole session — only predictions are re-fetched every 60 s.
      ================================================================ */
   var TTC_ROUTES = [
+    {tag:'109', name:'Ranee'},
     {tag:'128', name:'Stanley Greene'},
     {tag:'29',  name:'Dufferin'}
   ];
-  var MAX_STOP_DIST = 250;
-  var UMO_BASE = 'https://retro.umoiq.com/service/publicXMLFeed?a=ttc';
+  var MAX_STOP_DIST = 400;  /* metres — wider net catches route 109 stop on Lawrence */
   var discoveredStops = null; /* set after first successful routeConfig, never cleared */
 
   function fetchUMO(command) {
-    var full = UMO_BASE + command;
-    var attempts = [
-      full,
-      'https://corsproxy.io/?' + encodeURIComponent(full),
-      'https://api.allorigins.win/raw?url=' + encodeURIComponent(full)
+    var bases = [
+      'https://retro.umoiq.com/service/publicXMLFeed?a=ttc',
+      'https://umoiq.com/service/publicXMLFeed?a=ttc'
     ];
+    var proxies = [
+      function(u){ return 'https://corsproxy.io/?' + encodeURIComponent(u); },
+      function(u){ return 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u); },
+      function(u){ return 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(u); },
+      function(u){ return 'https://thingproxy.freeboard.io/fetch/' + u; }
+    ];
+    var attempts = [];
+    bases.forEach(function(base) {
+      var full = base + command;
+      attempts.push(full);
+      proxies.forEach(function(pf){ attempts.push(pf(full)); });
+    });
     function tryIdx(i) {
       if (i >= attempts.length) return Promise.reject(new Error('all endpoints failed'));
       return fetch(attempts[i])
         .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+        .then(function(txt) {
+          if (!txt || txt.length < 30) throw new Error('empty');
+          var t = txt.trimStart().toLowerCase();
+          if (t.startsWith('<!doctype') || t.startsWith('<html')) throw new Error('html error page');
+          return txt;
+        })
         .catch(function() { return tryIdx(i + 1); });
     }
     return tryIdx(0);
@@ -841,6 +857,14 @@
   function renderTTCFallback(subwayHtml) {
     /* Show static route/frequency info while real-time is unavailable */
     var staticRoutes = [
+      {
+        num: '109', name: 'Ranee',
+        stop: 'Lawrence Ave W at Allen Rd (~3 min walk)',
+        dirs: [
+          {n:'East → Lawrence Stn (Yonge)',  f:'~10–15 min'},
+          {n:'West → Allen Rd loop',          f:'~10–15 min'}
+        ]
+      },
       {
         num: '128', name: 'Stanley Greene',
         stop: 'Varna Dr at Allen Rd (on-street)',
