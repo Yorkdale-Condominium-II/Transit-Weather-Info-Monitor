@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Yorkdale II — Bus Stop Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <style>
+    /* ================================================================
+       DESIGN TOKENS — matches index.html (main transit board)
+       ================================================================ */
+    :root {
+      --bg:           #0A0A0A;
+      --surface:      #141414;
+      --surface-2:    #1C1C1C;
+      --border:       #2A2A2A;
+      --text:         #F0F0F0;
+      --muted:        #ACACAC;
+      --dim:          #808080;
+
+      --ttc:          #DA251D;
+      --good:         #22C55E;
+      --warn:         #F59E0B;
+      --bad:          #EF4444;
+
+      --r52:          #F59E0B;   /* 52 Lawrence West — amber   */
+      --r109:         #3B82F6;   /* 109 Ranee        — blue    */
+      --r29:          #22C55E;   /* 29 Dufferin      — green   */
+
+      --r:            6px;
+      --f-sans:       'Segoe UI', system-ui, -apple-system, sans-serif;
+      --f-mono:       'Consolas', 'SF Mono', 'Fira Code', monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--f-sans);
+      line-height: 1.4;
+      overflow: hidden;
+    }
+    a { color: inherit; text-decoration: none; }
+
+    .board {
+      display: grid;
+      grid-template-rows: 72px 1fr;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    /* ---- Header bar (same as main board) ---- */
+    .bar {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      padding: 0 2rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      z-index: 1200;
+    }
+    .bar-left { display: flex; align-items: center; gap: 0.75rem; }
+    .bar-logo {
+      font-size: 0.8rem; font-weight: 700; letter-spacing: 0.06em;
+      text-transform: uppercase; color: var(--muted);
+    }
+    .bar-sep { width: 1px; height: 24px; background: var(--border); }
+    .bar-location { font-size: 0.82rem; color: var(--dim); }
+    .bar-clock {
+      text-align: center;
+      font-family: var(--f-mono);
+      font-size: 2rem; font-weight: 600;
+      letter-spacing: 0.04em;
+      font-variant-numeric: tabular-nums;
+    }
+    .bar-date {
+      font-size: 0.75rem; color: var(--muted);
+      text-align: center; margin-top: 0.05rem; letter-spacing: 0.03em;
+    }
+    .bar-right { display: flex; justify-content: flex-end; align-items: center; gap: 0.75rem; }
+    .board-link {
+      font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em;
+      text-transform: uppercase; color: var(--muted);
+      border: 1px solid var(--border); border-radius: var(--r);
+      padding: 0.35rem 0.75rem;
+      background: var(--surface-2);
+    }
+    .board-link:hover { color: var(--text); border-color: var(--dim); }
+
+    /* ---- Map ---- */
+    .map-wrap { position: relative; overflow: hidden; }
+    #map { width: 100%; height: 100%; background: #111; }
+
+    /* Leaflet dark-theme adjustments */
+    .leaflet-container { font-family: var(--f-sans); }
+    .leaflet-popup-content-wrapper, .leaflet-popup-tip {
+      background: var(--surface-2); color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .leaflet-popup-content { margin: 0.6rem 0.85rem; font-size: 0.78rem; line-height: 1.5; }
+    .leaflet-control-attribution {
+      background: rgba(10,10,10,0.7) !important; color: var(--dim) !important;
+      font-size: 0.6rem !important;
+    }
+    .leaflet-control-attribution a { color: var(--muted) !important; }
+    .leaflet-control-zoom a {
+      background: var(--surface-2) !important; color: var(--text) !important;
+      border-color: var(--border) !important;
+    }
+
+    /* Home marker */
+    .home-icon {
+      font-size: 22px; line-height: 1;
+      filter: drop-shadow(0 0 4px rgba(0,0,0,0.9));
+    }
+
+    /* Popup bits */
+    .pp-route {
+      display: inline-block; color: #fff; font-weight: 700;
+      font-size: 0.72rem; padding: 0.12rem 0.5rem; border-radius: 3px;
+      margin-bottom: 0.25rem;
+    }
+    .pp-dir  { color: var(--text); font-weight: 600; }
+    .pp-stop { color: var(--muted); }
+    .pp-dist { color: var(--dim); font-family: var(--f-mono); font-size: 0.7rem; }
+
+    /* ---- Side panel ---- */
+    .panel {
+      position: absolute; top: 1rem; right: 1rem; z-index: 1100;
+      width: 330px; max-height: calc(100% - 2rem);
+      display: flex; flex-direction: column;
+      background: rgba(20,20,20,0.92);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      overflow: hidden;
+      backdrop-filter: blur(4px);
+    }
+    .panel-head {
+      padding: 0.6rem 0.9rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface-2);
+    }
+    .panel-title {
+      font-size: 0.65rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.1em; color: var(--muted);
+    }
+    .panel-sub { font-size: 0.62rem; color: var(--dim); margin-top: 0.15rem; }
+    .panel-body { overflow-y: auto; scrollbar-width: none; }
+    .panel-body::-webkit-scrollbar { display: none; }
+
+    .status-line {
+      padding: 0.45rem 0.9rem; font-size: 0.65rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .st-ok   { color: var(--good); }
+    .st-warn { color: var(--warn); }
+
+    .route-group { border-bottom: 1px solid var(--border); }
+    .route-group:last-child { border-bottom: none; }
+    .route-head {
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.5rem 0.9rem;
+      background: rgba(255,255,255,0.03);
+    }
+    .route-chip {
+      color: #fff; font-size: 0.72rem; font-weight: 700;
+      padding: 0.15rem 0.5rem; border-radius: 3px;
+      font-variant-numeric: tabular-nums;
+    }
+    .route-name { font-size: 0.78rem; font-weight: 600; color: var(--text); }
+    .route-count { margin-left: auto; font-size: 0.62rem; color: var(--dim); font-family: var(--f-mono); }
+
+    .stop-row {
+      display: flex; align-items: baseline; gap: 0.5rem;
+      padding: 0.4rem 0.9rem 0.4rem 1.2rem;
+      border-top: 1px solid rgba(42,42,42,0.6);
+      cursor: pointer;
+    }
+    .stop-row:hover { background: rgba(255,255,255,0.05); }
+    .stop-info { flex: 1; min-width: 0; }
+    .stop-dir  { font-size: 0.7rem; font-weight: 600; color: var(--text); }
+    .stop-name { font-size: 0.62rem; color: var(--dim); margin-top: 0.05rem; }
+    .stop-dist { font-size: 0.65rem; color: var(--muted); font-family: var(--f-mono); white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .no-stops  { padding: 0.4rem 0.9rem 0.5rem 1.2rem; font-size: 0.65rem; color: var(--dim); font-style: italic; }
+
+    @media (max-width: 700px) {
+      .panel {
+        left: 0.5rem; right: 0.5rem; top: auto; bottom: 0.5rem;
+        width: auto; max-height: 45%;
+      }
+      .bar { padding: 0 1rem; }
+      .bar-clock { font-size: 1.4rem; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="board">
+
+  <header class="bar">
+    <div class="bar-left">
+      <span class="bar-logo">120 Varna Drive</span>
+      <span class="bar-sep"></span>
+      <span class="bar-location">Bus Stop Map — 500 m radius</span>
+    </div>
+    <div>
+      <div class="bar-clock" id="clock">—:——</div>
+      <div class="bar-date" id="dateline">—</div>
+    </div>
+    <div class="bar-right">
+      <a class="board-link" href="./index.html">← Transit Board</a>
+    </div>
+  </header>
+
+  <div class="map-wrap">
+    <div id="map"></div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title">Nearby Bus Stops</div>
+        <div class="panel-sub">TTC stops within 500 m · tap a stop to locate it</div>
+      </div>
+      <div class="status-line st-warn" id="status">Loading stop data…</div>
+      <div class="panel-body" id="stop-list"></div>
+    </div>
+  </div>
+
+</div><!-- .board -->
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+(function () {
+  'use strict';
+
+  var LAT = 43.722, LON = -79.444;
+  var RADIUS_M = 500;
+
+  var ROUTES = [
+    {tag:'52',  name:'Lawrence West', color:'#F59E0B'},
+    {tag:'109', name:'Ranee',         color:'#3B82F6'},
+    {tag:'29',  name:'Dufferin',      color:'#22C55E'}
+  ];
+
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  /* ================================================================
+     CLOCK
+     ================================================================ */
+  function tickClock() {
+    var now = new Date();
+    var cl = document.getElementById('clock');
+    var dl = document.getElementById('dateline');
+    if (cl) cl.textContent = now.toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit',second:'2-digit',hour12:true});
+    if (dl) dl.textContent = now.toLocaleDateString('en-CA',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  }
+  tickClock();
+  setInterval(tickClock, 1000);
+
+  /* ================================================================
+     MAP — Leaflet + CARTO dark tiles
+     ================================================================ */
+  var map = L.map('map', {zoomControl: true}).setView([LAT, LON], 16);
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    subdomains: 'abcd', maxZoom: 19
+  }).addTo(map);
+
+  /* 500 m radius ring */
+  L.circle([LAT, LON], {
+    radius: RADIUS_M,
+    color: '#ACACAC', weight: 1.5, dashArray: '6 6',
+    fill: true, fillColor: '#2B85C8', fillOpacity: 0.05
+  }).addTo(map);
+
+  /* Home marker */
+  L.marker([LAT, LON], {
+    icon: L.divIcon({className:'home-icon', html:'🏠', iconSize:[24,24], iconAnchor:[12,12]}),
+    zIndexOffset: 1000
+  }).addTo(map).bindPopup('<b>120 Varna Drive</b><br><span class="pp-stop">North York, Toronto</span>');
+
+  /* ================================================================
+     TTC UMO API — same fallback cascade as the main board
+     ================================================================ */
+  function fetchUMO(command) {
+    var bases = [
+      'https://retro.umoiq.com/service/publicXMLFeed?a=ttc',
+      'https://umoiq.com/service/publicXMLFeed?a=ttc'
+    ];
+    var proxies = [
+      function(u){ return 'https://corsproxy.io/?' + encodeURIComponent(u); },
+      function(u){ return 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u); },
+      function(u){ return 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(u); },
+      function(u){ return 'https://thingproxy.freeboard.io/fetch/' + u; }
+    ];
+    var attempts = [];
+    bases.forEach(function(base) {
+      var full = base + command;
+      attempts.push(full);
+      proxies.forEach(function(pf){ attempts.push(pf(full)); });
+    });
+    function tryIdx(i) {
+      if (i >= attempts.length) return Promise.reject(new Error('all endpoints failed'));
+      return fetch(attempts[i])
+        .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+        .then(function(txt) {
+          if (!txt || txt.length < 30) throw new Error('empty');
+          var t = txt.trimStart().toLowerCase();
+          if (t.startsWith('<!doctype') || t.startsWith('<html')) throw new Error('html error page');
+          return txt;
+        })
+        .catch(function() { return tryIdx(i + 1); });
+    }
+    return tryIdx(0);
+  }
+
+  function haversine(lat1,lon1,lat2,lon2) {
+    var R=6371000, dLat=(lat2-lat1)*Math.PI/180, dLon=(lon2-lon1)*Math.PI/180;
+    var a=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2);
+    return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+  }
+
+  /* "East - 52 Lawrence West towards Lawrence Station" → "East → Lawrence Station" */
+  function shortDir(t) {
+    var m = String(t).match(/^(\w+)\s*-\s*.*?towards\s+(.+)$/i);
+    return m ? m[1] + ' → ' + m[2] : String(t);
+  }
+
+  /* ================================================================
+     STOP DISCOVERY — routeConfig per route, stops ≤ 500 m,
+     direction resolved from <direction> stop membership
+     ================================================================ */
+  var stopMarkers = {};   /* key route|stopTag → Leaflet marker */
+
+  function loadStops() {
+    var promises = ROUTES.map(function(route) {
+      return fetchUMO('&command=routeConfig&r=' + route.tag + '&verbose')
+        .then(function(txt) {
+          var xml = new DOMParser().parseFromString(txt, 'text/xml');
+
+          /* stopTag → [direction titles] */
+          var dirsByStop = {};
+          var dirEls = Array.prototype.slice.call(xml.querySelectorAll('direction'));
+          var uiDirs = dirEls.filter(function(d){ return d.getAttribute('useForUI') === 'true'; });
+          (uiDirs.length ? uiDirs : dirEls).forEach(function(dir) {
+            var title = dir.getAttribute('title') || dir.getAttribute('name') || '';
+            dir.querySelectorAll('stop').forEach(function(ref) {
+              var tag = ref.getAttribute('tag');
+              if (!dirsByStop[tag]) dirsByStop[tag] = [];
+              if (title && dirsByStop[tag].indexOf(title) === -1) dirsByStop[tag].push(title);
+            });
+          });
+
+          var nearby = [];
+          xml.querySelectorAll('stop[lat]').forEach(function(s) {
+            var slat = parseFloat(s.getAttribute('lat'));
+            var slon = parseFloat(s.getAttribute('lon'));
+            var d = haversine(LAT, LON, slat, slon);
+            if (d <= RADIUS_M) {
+              nearby.push({
+                route: route,
+                stopTag: s.getAttribute('tag'),
+                title: s.getAttribute('title') || '',
+                lat: slat, lon: slon,
+                dist: Math.round(d),
+                dirs: (dirsByStop[s.getAttribute('tag')] || []).map(shortDir)
+              });
+            }
+          });
+          return {route: route, stops: nearby, ok: true};
+        })
+        .catch(function() { return {route: route, stops: [], ok: false}; });
+    });
+
+    Promise.all(promises).then(function(results) {
+      var anyOk = results.some(function(r){ return r.ok; });
+      var statusEl = document.getElementById('status');
+
+      if (!anyOk) {
+        statusEl.className = 'status-line st-warn';
+        statusEl.textContent = '⚠ Live stop data unavailable — retrying in 60 s';
+        setTimeout(loadStops, 60000);
+        return;
+      }
+
+      statusEl.className = 'status-line st-ok';
+      statusEl.textContent = '● Live stop data · TTC route config';
+
+      renderStops(results);
+    });
+  }
+
+  function renderStops(results) {
+    /* Clear previous markers */
+    Object.keys(stopMarkers).forEach(function(k){ map.removeLayer(stopMarkers[k]); });
+    stopMarkers = {};
+
+    var listHtml = '';
+
+    results.forEach(function(res) {
+      var route = res.route;
+      var stops = res.stops.slice().sort(function(a,b){ return a.dist - b.dist; });
+
+      listHtml += '<div class="route-group">'
+        + '<div class="route-head">'
+        + '<span class="route-chip" style="background:' + route.color + '">' + esc(route.tag) + '</span>'
+        + '<span class="route-name">' + esc(route.name) + '</span>'
+        + '<span class="route-count">' + stops.length + ' stop' + (stops.length === 1 ? '' : 's') + '</span>'
+        + '</div>';
+
+      if (!stops.length) {
+        listHtml += '<div class="no-stops">'
+          + (res.ok ? 'No stops within ' + RADIUS_M + ' m' : 'Route data unavailable')
+          + '</div>';
+      }
+
+      stops.forEach(function(s) {
+        var key = route.tag + '|' + s.stopTag;
+        var dirText = s.dirs.length ? s.dirs.join(' · ') : 'Direction n/a';
+
+        /* Map marker */
+        var marker = L.circleMarker([s.lat, s.lon], {
+          radius: 8,
+          color: '#0A0A0A', weight: 2,
+          fillColor: route.color, fillOpacity: 0.95
+        }).addTo(map).bindPopup(
+          '<span class="pp-route" style="background:' + route.color + '">' + esc(route.tag) + ' ' + esc(route.name) + '</span><br>'
+          + '<span class="pp-dir">' + esc(dirText) + '</span><br>'
+          + '<span class="pp-stop">' + esc(s.title) + '</span><br>'
+          + '<span class="pp-dist">' + s.dist + ' m from home</span>'
+        );
+        stopMarkers[key] = marker;
+
+        /* Panel row */
+        listHtml += '<div class="stop-row" data-key="' + esc(key) + '">'
+          + '<div class="stop-info">'
+          + '<div class="stop-dir" style="color:' + route.color + '">' + esc(dirText) + '</div>'
+          + '<div class="stop-name">' + esc(s.title) + '</div>'
+          + '</div>'
+          + '<span class="stop-dist">' + s.dist + ' m</span>'
+          + '</div>';
+      });
+
+      listHtml += '</div>';
+    });
+
+    var listEl = document.getElementById('stop-list');
+    listEl.innerHTML = listHtml;
+
+    /* Click a row → pan + open popup */
+    listEl.querySelectorAll('.stop-row').forEach(function(row) {
+      row.addEventListener('click', function() {
+        var m = stopMarkers[row.getAttribute('data-key')];
+        if (m) { map.panTo(m.getLatLng()); m.openPopup(); }
+      });
+    });
+  }
+
+  loadStops();
+
+})();
+</script>
+</body>
+</html>
