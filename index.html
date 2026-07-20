@@ -710,8 +710,8 @@
      whole session — only predictions are re-fetched every 60 s.
      ================================================================ */
   var TTC_ROUTES = [
+    {tag:'52',  name:'Lawrence West'},
     {tag:'109', name:'Ranee'},
-    {tag:'128', name:'Stanley Greene'},
     {tag:'29',  name:'Dufferin'}
   ];
   var MAX_STOP_DIST = 800;  /* metres — show all bus stops within 800 m of 120 Varna */
@@ -858,24 +858,24 @@
     /* Show static route/frequency info while real-time is unavailable */
     var staticRoutes = [
       {
+        num: '52', name: 'Lawrence West',
+        stop: 'Lawrence Ave W at Allen Rd (on-street)',
+        dirs: [
+          {n:'East → Lawrence Stn (Yonge)', f:'~8–12 min'},
+          {n:'West → Humber Summit',         f:'~12–18 min'}
+        ]
+      },
+      {
         num: '109', name: 'Ranee',
-        stop: 'Lawrence Ave W at Allen Rd (~3 min walk)',
+        stop: 'Lawrence Ave W at Allen Rd (~2 min walk)',
         dirs: [
           {n:'East → Lawrence Stn (Yonge)',  f:'~10–15 min'},
           {n:'West → Allen Rd loop',          f:'~10–15 min'}
         ]
       },
       {
-        num: '128', name: 'Stanley Greene',
-        stop: 'Varna Dr at Allen Rd (on-street)',
-        dirs: [
-          {n:'East → Sheppard West Stn',        f:'~12–20 min'},
-          {n:'West → Downsview Park loop',       f:'~12–20 min'}
-        ]
-      },
-      {
         num: '29', name: 'Dufferin',
-        stop: 'Dufferin St at Wilson Ave (~5 min walk)',
+        stop: 'Dufferin St at Wilson Ave (~8 min walk)',
         dirs: [
           {n:'South → Dufferin Stn / Exhibition', f:'~5–8 min peak'},
           {n:'North → Steeles Ave',               f:'~5–8 min peak'}
