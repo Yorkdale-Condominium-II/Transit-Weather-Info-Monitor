@@ -116,9 +116,9 @@
     .leaflet-tooltip.stop-flag {
       background: rgba(16,16,16,0.92);
       border: 1px solid var(--border);
-      border-radius: 4px;
+      border-radius: 5px;
       box-shadow: 0 2px 10px rgba(0,0,0,0.65);
-      padding: 0.3rem 0.5rem;
+      padding: 0.4rem 0.6rem;
       color: var(--text);
       white-space: nowrap;
     }
@@ -126,24 +126,24 @@
     .leaflet-tooltip-bottom.stop-flag::before { border-bottom-color: rgba(16,16,16,0.92); }
     .leaflet-tooltip-left.stop-flag::before   { border-left-color: rgba(16,16,16,0.92); }
     .leaflet-tooltip-right.stop-flag::before  { border-right-color: rgba(16,16,16,0.92); }
-    .fc-line1 { display: flex; align-items: center; gap: 0.4rem; }
+    .fc-line1 { display: flex; align-items: center; gap: 0.45rem; }
     .fc-chip {
-      color: #fff; font-size: 0.62rem; font-weight: 700;
-      padding: 0.08rem 0.4rem; border-radius: 3px;
+      color: #fff; font-size: 0.72rem; font-weight: 700;
+      padding: 0.1rem 0.45rem; border-radius: 3px;
       font-variant-numeric: tabular-nums;
     }
-    .fc-dir  { font-size: 0.66rem; font-weight: 600; }
-    .fc-line2 { font-size: 0.56rem; color: var(--muted); margin-top: 0.15rem; }
+    .fc-dir  { font-size: 0.86rem; font-weight: 700; }
+    .fc-line2 { font-size: 0.72rem; color: var(--muted); margin-top: 0.22rem; }
 
     /* Popup bits */
     .pp-route {
       display: inline-block; color: #fff; font-weight: 700;
-      font-size: 0.72rem; padding: 0.12rem 0.5rem; border-radius: 3px;
-      margin-bottom: 0.25rem;
+      font-size: 0.8rem; padding: 0.15rem 0.55rem; border-radius: 3px;
+      margin-bottom: 0.3rem;
     }
-    .pp-dir  { color: var(--text); font-weight: 600; }
-    .pp-stop { color: var(--muted); }
-    .pp-dist { color: var(--dim); font-family: var(--f-mono); font-size: 0.7rem; }
+    .pp-dir  { color: var(--text); font-weight: 700; font-size: 0.86rem; }
+    .pp-stop { color: var(--muted); font-size: 0.78rem; }
+    .pp-dist { color: var(--dim); font-family: var(--f-mono); font-size: 0.76rem; }
 
     /* ---- Compact legend (bottom-left) ---- */
     .legend {
@@ -156,17 +156,22 @@
       min-width: 190px;
     }
     .legend-head {
-      font-size: 0.6rem; font-weight: 700; text-transform: uppercase;
+      font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
       letter-spacing: 0.09em; color: var(--muted);
-      margin-bottom: 0.4rem;
+      margin-bottom: 0.45rem;
     }
     .lg-row {
-      display: flex; align-items: center; gap: 0.45rem;
-      font-size: 0.7rem; color: var(--text);
-      padding: 0.12rem 0;
+      display: flex; align-items: center; gap: 0.5rem;
+      font-size: 0.78rem; color: var(--text);
+      padding: 0.15rem 0;
     }
-    .lg-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; border: 2px solid #0A0A0A; }
-    .lg-count { margin-left: auto; font-family: var(--f-mono); font-size: 0.62rem; color: var(--dim); }
+    .lg-dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; border: 2px solid #0A0A0A; }
+    .lg-count { margin-left: auto; font-family: var(--f-mono); font-size: 0.68rem; color: var(--dim); }
+    .lg-routes {
+      margin-top: 0.4rem; padding-top: 0.35rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.62rem; color: var(--dim); font-family: var(--f-mono);
+    }
     .legend-status {
       margin-top: 0.4rem; padding-top: 0.4rem;
       border-top: 1px solid var(--border);
@@ -233,13 +238,32 @@
   var homeCalibrated = false;
   var RADIUS_M = 500;
 
-  var FLAG_H = 38;          /* estimated flag card height, px */
+  var FLAG_H = 50;          /* estimated flag card height, px (matches larger card text) */
 
   var ROUTES = [
-    {tag:'52',  name:'Lawrence West', color:'#F59E0B'},
-    {tag:'109', name:'Ranee',         color:'#3B82F6'},
-    {tag:'29',  name:'Dufferin',      color:'#22C55E'}
+    {tag:'52',  name:'Lawrence West'},
+    {tag:'109', name:'Ranee'},
+    {tag:'29',  name:'Dufferin'}
   ];
+
+  /* Colours encode the compass direction a stop's buses travel */
+  var COMPASS = [
+    {key:'north', label:'North', color:'#3B82F6'},   /* blue  */
+    {key:'east',  label:'East',  color:'#22C55E'},   /* green */
+    {key:'south', label:'South', color:'#EF4444'},   /* red   */
+    {key:'west',  label:'West',  color:'#F59E0B'}    /* amber */
+  ];
+  var NO_DIR_COLOR = '#8A999A';                       /* grey — direction n/a */
+
+  function compassKey(dirText) {
+    var m = String(dirText).match(/\b(north|south|east|west)\b/i);
+    return m ? m[1].toLowerCase() : null;
+  }
+  function compassColor(dirText) {
+    var k = compassKey(dirText);
+    for (var i = 0; i < COMPASS.length; i++) if (COMPASS[i].key === k) return COMPASS[i].color;
+    return NO_DIR_COLOR;
+  }
 
   function esc(s) {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -430,14 +454,36 @@
   }
 
   function renderLegend(results) {
-    var h = '';
+    /* Count stops per compass direction across all routes */
+    var counts = {north:0, east:0, south:0, west:0}, naCount = 0;
     results.forEach(function(res) {
+      res.stops.forEach(function(s) {
+        var dirText = s.dirs && s.dirs.length ? s.dirs.join(' · ') : '';
+        var k = compassKey(dirText);
+        if (k && counts.hasOwnProperty(k)) counts[k]++; else naCount++;
+      });
+    });
+
+    var h = '';
+    COMPASS.forEach(function(c) {
       h += '<div class="lg-row">'
-        + '<span class="lg-dot" style="background:' + res.route.color + '"></span>'
-        + esc(res.route.tag) + ' ' + esc(res.route.name)
-        + '<span class="lg-count">' + (res.ok ? res.stops.length : '—') + '</span>'
+        + '<span class="lg-dot" style="background:' + c.color + '"></span>'
+        + esc(c.label) + 'bound'
+        + '<span class="lg-count">' + counts[c.key] + '</span>'
         + '</div>';
     });
+    if (naCount) {
+      h += '<div class="lg-row">'
+        + '<span class="lg-dot" style="background:' + NO_DIR_COLOR + '"></span>'
+        + 'Direction n/a'
+        + '<span class="lg-count">' + naCount + '</span>'
+        + '</div>';
+    }
+
+    /* Routes shown, as a subtext line so the info isn't lost */
+    var routeTags = results.map(function(r){ return r.route.tag; }).join(' · ');
+    h += '<div class="lg-routes">Routes ' + esc(routeTags) + '</div>';
+
     document.getElementById('legend-rows').innerHTML = h;
   }
 
@@ -479,9 +525,9 @@
   }
 
   function estCardW(line1, line2) {
-    var w1 = 32 + line1.length * 6.3;   /* chip + gap + dir text */
-    var w2 = line2.length * 5.2;
-    return Math.min(Math.max(w1, w2) + 18, 260);
+    var w1 = 40 + line1.length * 7.6;   /* chip + gap + dir text (0.86rem bold) */
+    var w2 = line2.length * 6.2;        /* stop title · distance (0.72rem) */
+    return Math.min(Math.max(w1, w2) + 20, 290);
   }
 
   function renderStops(results) {
@@ -492,8 +538,8 @@
     var flat = [];
     results.forEach(function(res) {
       res.stops.forEach(function(s) {
-        s.color = res.route.color;
         s.dirText = s.dirs.length ? s.dirs.join(' · ') : 'Direction n/a';
+        s.color = compassColor(s.dirText);   /* colour by compass direction */
         s.line1 = trunc(s.dirText, 30);
         s.line2 = trunc(s.title, 34) + ' · ' + s.dist + ' m';
         s.cardW = estCardW(s.line1, s.line2);
