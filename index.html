@@ -789,14 +789,27 @@
     var subwayHtml = buildSubwayHtml();
     if (discoveredStops) { fetchTTCPredictions(subwayHtml, discoveredStops); return; }
 
-    /* First run: fetch full stop lists via routeConfig */
+    /* First run: fetch full stop lists via routeConfig, tagging each
+       stop with the direction it serves (needed to show both ways) */
     var cfgPromises = TTC_ROUTES.map(function(route) {
       return fetchUMO('&command=routeConfig&r=' + route.tag + '&verbose')
         .then(function(txt) {
           var xml = new DOMParser().parseFromString(txt,'text/xml');
+          /* stopTag → direction title (useForUI directions preferred) */
+          var uiMap = {}, allMap = {};
+          Array.prototype.forEach.call(xml.querySelectorAll('direction'), function(dir) {
+            var title = dir.getAttribute('title') || dir.getAttribute('name') || '';
+            var target = dir.getAttribute('useForUI') === 'true' ? uiMap : allMap;
+            dir.querySelectorAll('stop').forEach(function(ref) {
+              var tag = ref.getAttribute('tag');
+              if (target[tag] === undefined) target[tag] = title;
+            });
+          });
           var all = [];
           xml.querySelectorAll('stop[lat]').forEach(function(s) {
-            all.push({route:route, stopTag:s.getAttribute('tag'), stopTitle:s.getAttribute('title')||'',
+            var tag = s.getAttribute('tag');
+            all.push({route:route, stopTag:tag, stopTitle:s.getAttribute('title')||'',
+                      dir: uiMap[tag] || allMap[tag] || '',
                       lat:parseFloat(s.getAttribute('lat')), lon:parseFloat(s.getAttribute('lon'))});
           });
           return all;
@@ -818,14 +831,20 @@
       var anchor = pin || pinAlt;
       if (anchor) { LAT = anchor.lat; LON = anchor.lon; }
 
-      /* Keep only the nearest in-range stop per route to avoid duplicates */
+      /* Dedup in-range stops. Most routes show their single nearest
+         stop; routes in BOTH_DIR_ROUTES show the nearest stop in each
+         direction (e.g. 109 Ranee both ways). */
+      var BOTH_DIR_ROUTES = { '109': true };
       var nearest = {};
       results.forEach(function(arr) {
         arr.forEach(function(s) {
           s.dist = Math.round(haversine(LAT, LON, s.lat, s.lon));
           if (s.dist > MAX_STOP_DIST) return;
-          if (!nearest[s.route.tag] || s.dist < nearest[s.route.tag].dist) {
-            nearest[s.route.tag] = s;
+          var key = BOTH_DIR_ROUTES[s.route.tag]
+            ? s.route.tag + '|' + (s.dir || s.stopTag)   /* nearest per direction */
+            : s.route.tag;                                /* nearest overall */
+          if (!nearest[key] || s.dist < nearest[key].dist) {
+            nearest[key] = s;
           }
         });
       });
