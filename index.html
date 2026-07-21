@@ -424,6 +424,68 @@
     .state-msg { font-size: 0.78rem; color: var(--dim); padding: 1rem 0; }
 
     /* ================================================================
+       SOUND TOGGLE (header)
+       ================================================================ */
+    .snd-btn {
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      margin-left: 0.6rem; cursor: pointer;
+      font-size: 0.68rem; font-weight: 600; letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--dim);
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 0.28rem 0.55rem;
+      font-family: var(--f-sans);
+    }
+    .snd-btn:hover { color: var(--text); border-color: var(--dim); }
+    .snd-btn.on { color: var(--good); border-color: var(--good); }
+    .snd-ico { font-size: 0.85rem; line-height: 1; }
+
+    /* ================================================================
+       DISRUPTION EMPHASIS — a line that is down / on shuttle buses
+       ================================================================ */
+    .svc-row.disrupted { background: rgba(239,68,68,0.10); }
+    @keyframes flash-alert { 0%,100%{background:rgba(239,68,68,0.10)} 50%{background:rgba(239,68,68,0.26)} }
+    .svc-row.just-changed { animation: flash-alert 1s ease-in-out 3; }
+    .svc-shuttle {
+      font-size: clamp(0.55rem, 0.75vh, 0.62rem); color: var(--warn);
+      margin-top: 0.1rem; font-weight: 600;
+    }
+    .svc-shuttle .bus-ico { margin-right: 0.25rem; }
+
+    /* ================================================================
+       TEST PANEL — press "t" to toggle; for simulating disruptions
+       ================================================================ */
+    .test-panel {
+      position: fixed; top: 84px; right: 16px; z-index: 3000;
+      width: 320px; display: none;
+      background: rgba(18,18,18,0.97);
+      border: 1px solid var(--border); border-radius: var(--r);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.7);
+      padding: 0.85rem;
+      font-family: var(--f-sans);
+    }
+    .test-panel.open { display: block; }
+    .test-title {
+      font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.1em; color: var(--warn); margin-bottom: 0.15rem;
+    }
+    .test-hint { font-size: 0.6rem; color: var(--dim); margin-bottom: 0.7rem; }
+    .test-btn {
+      display: block; width: 100%; text-align: left; cursor: pointer;
+      font-size: 0.72rem; font-family: var(--f-sans); color: var(--text);
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: 5px; padding: 0.5rem 0.6rem; margin-bottom: 0.4rem;
+      line-height: 1.35;
+    }
+    .test-btn:hover { border-color: var(--dim); }
+    .test-btn.active { background: rgba(239,68,68,0.18); border-color: var(--bad); color: #fff; }
+    .test-btn small { display: block; color: var(--dim); font-size: 0.62rem; margin-top: 0.1rem; }
+    .test-btn.active small { color: rgba(255,255,255,0.75); }
+    .test-row { display: flex; gap: 0.4rem; margin-top: 0.5rem; }
+    .test-row .test-btn { margin-bottom: 0; text-align: center; }
+    .test-util { background: var(--surface); }
+
+    /* ================================================================
        RESPONSIVE (for non-TV screens)
        ================================================================ */
     @media (max-width: 1100px) {
@@ -461,8 +523,33 @@
       <span class="dot-live" aria-hidden="true"></span>
       <span class="live-label">Live</span>
       <span class="updated-label" id="updated">—</span>
+      <button class="snd-btn" id="snd-btn" type="button" title="Chime when a service status changes">
+        <span class="snd-ico" id="snd-ico">🔇</span><span id="snd-txt">Sound off</span>
+      </button>
     </div>
   </header>
+
+  <!-- Test panel (press "t" to toggle) — simulate service disruptions -->
+  <div class="test-panel" id="test-panel">
+    <div class="test-title">Test / Simulation</div>
+    <div class="test-hint">Inject a fake disruption to preview the board &amp; chime. Press <b>T</b> to close.</div>
+    <button class="test-btn" id="sim-line1" type="button" data-sim="line1">
+      Line 1 — closure with shuttle buses
+      <small>No service Cedarvale ↔ St George · buses running between</small>
+    </button>
+    <button class="test-btn" id="sim-line2" type="button" data-sim="line2">
+      Line 2 — minor delay
+      <small>Longer waits Bloor–Danforth (signal problem)</small>
+    </button>
+    <button class="test-btn" id="sim-go" type="button" data-sim="go">
+      GO — Barrie line delay
+      <small>Barrie line trains delayed up to 30 min</small>
+    </button>
+    <div class="test-row">
+      <button class="test-btn test-util" id="test-chime" type="button">▶ Test chime</button>
+      <button class="test-btn test-util" id="sim-clear" type="button">✕ Clear all</button>
+    </div>
+  </div>
 
 
   <!-- ============================================================
@@ -1022,53 +1109,65 @@
     document.getElementById('go-body').innerHTML = h;
   }
 
+  var lastApiGo = [];
+
+  function renderGoStatus(apiAlerts) {
+    var alerts = simAlerts(SIM_GO).concat(apiAlerts || []);
+
+    GO_TRAIN_LINES.forEach(function(line) {
+      line.active = alerts.filter(function(a) {
+        var t = ((a.lineName || a.title || a.header || '') + ' ' + (a.description || a.body || '')).toLowerCase();
+        return line.kw.some(function(k){ return t.indexOf(k) !== -1; });
+      });
+    });
+
+    var html = '<div class="subway-title">GO Train — Union Station</div>'
+      + unionAfterBanner();
+    var sigParts = [], score = 0;
+    GO_TRAIN_LINES.forEach(function(line) {
+      var ok = !line.active.length;
+      if (!ok) score += 1;
+      sigParts.push(line.code + ':' + line.active.length);
+      html += '<div class="svc-row">'
+        + '<span class="dot ' + (ok ? 'd-ok' : 'd-warn') + '"></span>'
+        + '<span class="line-chip ' + line.cls + '">' + esc(line.code) + '</span>'
+        + '<div class="svc-info"><div class="svc-name">' + esc(line.name) + '</div>'
+        + '<div class="svc-sub">' + esc(line.dir) + ' &nbsp;·&nbsp; ' + esc(line.freq) + '</div></div>'
+        + '<span class="svc-status ' + (ok ? 's-ok' : 's-warn') + '">'
+        + (ok ? 'Good service' : line.active.length + ' alert' + (line.active.length > 1 ? 's' : ''))
+        + '</span></div>';
+    });
+
+    if (alerts.length) {
+      html += '<div class="subway-title" style="padding-top:0.4rem">Active Alerts (' + alerts.length + ')</div>'
+        + '<div class="alerts-scroll">';
+      alerts.forEach(function(a) {
+        var title = a.lineName || a.title || a.header || 'Alert';
+        var desc  = a.description || a.body || a.message || '';
+        html += '<div class="svc-row alert-row">'
+          + '<span class="dot d-warn" style="margin-top:0.2rem;flex-shrink:0"></span>'
+          + '<div style="flex:1;min-width:0">'
+          + '<div class="svc-name">' + esc(title) + (a.sim ? ' <span style="color:var(--warn);font-size:0.58rem;font-weight:700">[TEST]</span>' : '') + '</div>'
+          + (desc ? '<div class="alert-desc">' + esc(desc.slice(0,180)) + (desc.length > 180 ? '…' : '') + '</div>' : '')
+          + '</div></div>';
+      });
+      html += '</div>';
+    }
+
+    var block = document.getElementById('go-train-status-block');
+    if (block) block.innerHTML = html;
+
+    maybeChime('go', sigParts.join('|'), score);
+  }
+
   function loadGOTrainStatus() {
     fetch('https://backend.gotransit.com/v2/api/ServiceAlerts')
       .then(function(r){ return r.json(); })
       .then(function(data) {
-        var alerts = Array.isArray(data) ? data : (Array.isArray(data.alerts) ? data.alerts : []);
-
-        GO_TRAIN_LINES.forEach(function(line) {
-          line.active = alerts.filter(function(a) {
-            var t = ((a.lineName || a.title || a.header || '') + ' ' + (a.description || a.body || '')).toLowerCase();
-            return line.kw.some(function(k){ return t.indexOf(k) !== -1; });
-          });
-        });
-
-        var html = '<div class="subway-title">GO Train — Union Station</div>'
-          + unionAfterBanner();
-        GO_TRAIN_LINES.forEach(function(line) {
-          var ok = !line.active.length;
-          html += '<div class="svc-row">'
-            + '<span class="dot ' + (ok ? 'd-ok' : 'd-warn') + '"></span>'
-            + '<span class="line-chip ' + line.cls + '">' + esc(line.code) + '</span>'
-            + '<div class="svc-info"><div class="svc-name">' + esc(line.name) + '</div>'
-            + '<div class="svc-sub">' + esc(line.dir) + ' &nbsp;·&nbsp; ' + esc(line.freq) + '</div></div>'
-            + '<span class="svc-status ' + (ok ? 's-ok' : 's-warn') + '">'
-            + (ok ? 'Good service' : line.active.length + ' alert' + (line.active.length > 1 ? 's' : ''))
-            + '</span></div>';
-        });
-
-        if (alerts.length) {
-          html += '<div class="subway-title" style="padding-top:0.4rem">Active Alerts (' + alerts.length + ')</div>'
-            + '<div class="alerts-scroll">';
-          alerts.forEach(function(a) {
-            var title = a.lineName || a.title || a.header || 'Alert';
-            var desc  = a.description || a.body || a.message || '';
-            html += '<div class="svc-row alert-row">'
-              + '<span class="dot d-warn" style="margin-top:0.2rem;flex-shrink:0"></span>'
-              + '<div style="flex:1;min-width:0">'
-              + '<div class="svc-name">' + esc(title) + '</div>'
-              + (desc ? '<div class="alert-desc">' + esc(desc.slice(0,160)) + (desc.length > 160 ? '…' : '') + '</div>' : '')
-              + '</div></div>';
-          });
-          html += '</div>';
-        }
-
-        var block = document.getElementById('go-train-status-block');
-        if (block) block.innerHTML = html;
+        lastApiGo = Array.isArray(data) ? data : (Array.isArray(data.alerts) ? data.alerts : []);
+        renderGoStatus(lastApiGo);
       })
-      .catch(function(){ /* keep "Good service" defaults */ });
+      .catch(function(){ renderGoStatus(lastApiGo); });
   }
 
   /* ================================================================
@@ -1153,71 +1252,186 @@
   /* ================================================================
      SUBWAY ALERTS  — TTC live-alerts API
      ================================================================ */
-  function loadSubwayAlerts() {
-    var LINES = [
-      { num: 1, cls: 'l1', name: 'Yonge–University',   kw: ['line 1','yonge','university'],         busSub: false },
-      { num: 2, cls: 'l2', name: 'Bloor–Danforth',     kw: ['line 2','bloor','danforth'],           busSub: false },
-      { num: 3, cls: 'l3', name: 'Scarborough',        kw: ['line 3','scarborough'],                busSub: true  },
-      { num: 4, cls: 'l4', name: 'Sheppard',           kw: ['line 4','sheppard'],                   busSub: false },
-      { num: 5, cls: 'l5', name: 'Eglinton Crosstown', kw: ['line 5','eglinton','crosstown'],       busSub: false },
-      { num: 6, cls: 'l6', name: 'Finch West LRT',     kw: ['line 6','finch west','finch'],         busSub: false }
-    ];
+  /* ================================================================
+     CHIME — Web Audio, fully self-contained (no audio files).
+     A chime plays only when a service's *status* changes (a new
+     disruption appears or one clears) — never on routine prediction
+     or weather refreshes. Off by default (browser autoplay policy);
+     the header button turns it on.
+     ================================================================ */
+  var soundOn = false;
+  var audioCtx = null;
+  var statusState = {
+    subway: { first: true, sig: '', score: 0 },
+    go:     { first: true, sig: '', score: 0 }
+  };
 
+  function initAudio() {
+    if (audioCtx) return;
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+    catch (e) { audioCtx = null; }
+  }
+  function tone(freq, startAt, dur, peak) {
+    if (!audioCtx) return;
+    var osc = audioCtx.createOscillator(), g = audioCtx.createGain();
+    osc.type = 'sine'; osc.frequency.value = freq;
+    osc.connect(g); g.connect(audioCtx.destination);
+    var t0 = audioCtx.currentTime + startAt;
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(peak, t0 + 0.03);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.start(t0); osc.stop(t0 + dur + 0.03);
+  }
+  /* kind: 'alert' (something went down) or 'clear' (recovered) */
+  function chime(kind) {
+    initAudio();
+    if (!audioCtx) return;
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    if (kind === 'clear') { tone(660, 0, 0.45, 0.16); tone(988, 0.16, 0.55, 0.16); }   /* rising = good */
+    else { tone(988, 0, 0.4, 0.19); tone(740, 0.17, 0.5, 0.19); tone(587, 0.34, 0.6, 0.19); } /* falling = attention */
+  }
+  function setSound(on) {
+    soundOn = on;
+    if (on) initAudio();
+    try { localStorage.setItem('ttcSound', on ? '1' : '0'); } catch (e) {}
+    var btn = document.getElementById('snd-btn'),
+        ico = document.getElementById('snd-ico'),
+        txt = document.getElementById('snd-txt');
+    if (btn) btn.classList.toggle('on', on);
+    if (ico) ico.textContent = on ? '🔔' : '🔇';
+    if (txt) txt.textContent = on ? 'Sound on' : 'Sound off';
+  }
+  /* Compare a status signature; chime on change (after first load) */
+  function maybeChime(which, sig, score) {
+    var st = statusState[which];
+    if (st.first) { st.first = false; st.sig = sig; st.score = score; return false; }
+    if (sig === st.sig) return false;
+    var oldScore = st.score;
+    st.sig = sig; st.score = score;
+    /* score up or changed-at-same-level → attention; score down → recovery */
+    if (soundOn) chime(score < oldScore ? 'clear' : 'alert');
+    return true;
+  }
+
+  /* ================================================================
+     SIMULATION — test disruptions injected into the live feeds.
+     Toggled from the test panel (press "t"). Each scenario is a set
+     of synthetic alerts merged with the real API data.
+     ================================================================ */
+  var simActive = {};
+  var SIM_SUBWAY = {
+    line1: [{
+      sim: true, line: 1, severity: 'bad', busSub: true,
+      segment: 'Cedarvale ↔ St George',
+      title: 'Line 1 Yonge–University: No service Cedarvale to St George',
+      description: 'No subway service between Cedarvale and St George due to a signal problem. Shuttle buses are running in both directions between Cedarvale and St George, stopping at all stations in between. Allow extra travel time.'
+    }],
+    line2: [{
+      sim: true, line: 2, severity: 'warn',
+      title: 'Line 2 Bloor–Danforth: Longer wait times',
+      description: 'Trains are holding at some stations due to a signal problem. Expect longer waits in both directions.'
+    }]
+  };
+  var SIM_GO = {
+    go: [{
+      sim: true, severity: 'warn', lineName: 'Barrie',
+      title: 'Barrie line: delays up to 30 minutes',
+      description: 'A Barrie line trip is delayed up to 30 minutes due to a mechanical issue. Check gotransit.com for the latest.'
+    }]
+  };
+  function simAlerts(map) {
+    var out = [];
+    Object.keys(simActive).forEach(function(k){ if (map[k]) out = out.concat(map[k]); });
+    return out;
+  }
+
+  /* ================================================================
+     SUBWAY ALERTS  — TTC live-alerts API (+ simulations)
+     ================================================================ */
+  var SUBWAY_LINES = [
+    { num: 1, cls: 'l1', name: 'Yonge–University',   kw: ['line 1','yonge','university'],   busSub: false },
+    { num: 2, cls: 'l2', name: 'Bloor–Danforth',     kw: ['line 2','bloor','danforth'],     busSub: false },
+    { num: 3, cls: 'l3', name: 'Scarborough',        kw: ['line 3','scarborough'],          busSub: true  },
+    { num: 4, cls: 'l4', name: 'Sheppard',           kw: ['line 4','sheppard'],             busSub: false },
+    { num: 5, cls: 'l5', name: 'Eglinton Crosstown', kw: ['line 5','eglinton','crosstown'], busSub: false },
+    { num: 6, cls: 'l6', name: 'Finch West LRT',     kw: ['line 6','finch west','finch'],   busSub: false }
+  ];
+  var lastApiSubway = [];
+
+  function renderSubway(apiAlerts) {
+    var alerts = simAlerts(SIM_SUBWAY).concat(apiAlerts || []);
+
+    SUBWAY_LINES.forEach(function(line) {
+      line.active = alerts.filter(function(a) {
+        if (a.line === line.num) return true;
+        var t = ((a.title || a.header || '') + ' ' + (a.description || a.body || '')).toLowerCase();
+        return line.kw.some(function(k){ return t.indexOf(k) !== -1; });
+      });
+    });
+
+    var html = '<div class="subway-title">Subway &amp; LRT Service Status</div>';
+    var sigParts = [], score = 0;
+    SUBWAY_LINES.forEach(function(line) {
+      var bad = line.active.some(function(a){ return a.severity === 'bad' || a.busSub; });
+      var dotCls, statusCls, statusText, shuttle = '';
+      if (bad) {
+        dotCls = 'd-bad'; statusCls = 's-bad'; statusText = 'No service';
+        var seg = null, hasBus = false;
+        line.active.forEach(function(a){ if (a.segment && !seg) seg = a.segment; if (a.busSub) hasBus = true; });
+        shuttle = (seg ? seg + ' · ' : '') + (hasBus ? 'Shuttle buses running' : 'Service disruption');
+        score += 3;
+      } else if (line.busSub) {
+        dotCls = 'd-warn'; statusCls = 's-warn'; statusText = 'Bus substitute service';
+      } else if (line.active.length) {
+        dotCls = 'd-warn'; statusCls = 's-warn';
+        statusText = line.active.length + ' alert' + (line.active.length > 1 ? 's' : '');
+        score += 1;
+      } else {
+        dotCls = 'd-ok'; statusCls = 's-ok'; statusText = 'Good service';
+      }
+      sigParts.push(line.num + ':' + statusText + shuttle);
+      html += '<div class="svc-row' + (bad ? ' disrupted' : '') + '">'
+        + '<span class="dot ' + dotCls + '"></span>'
+        + '<span class="line-chip ' + line.cls + '">Line ' + line.num + '</span>'
+        + '<div class="svc-info"><div class="svc-name">' + line.name + '</div>'
+        + (shuttle ? '<div class="svc-shuttle"><span class="bus-ico">🚌</span>' + esc(shuttle) + '</div>' : '')
+        + '</div>'
+        + '<span class="svc-status ' + statusCls + '">' + statusText + '</span></div>';
+    });
+
+    if (alerts.length) {
+      html += '<div class="subway-title" style="padding-top:0.5rem">Active Alerts (' + alerts.length + ')</div>'
+        + '<div class="alerts-scroll">';
+      alerts.forEach(function(a) {
+        var title = a.title || a.header || 'Alert';
+        var desc  = a.description || a.body || a.text || '';
+        html += '<div class="svc-row alert-row">'
+          + '<span class="dot ' + (a.severity === 'bad' ? 'd-bad' : 'd-warn') + '" style="margin-top:0.2rem;flex-shrink:0"></span>'
+          + '<div style="flex:1;min-width:0">'
+          + '<div class="svc-name">' + esc(title) + (a.sim ? ' <span style="color:var(--warn);font-size:0.58rem;font-weight:700">[TEST]</span>' : '') + '</div>'
+          + (desc ? '<div class="alert-desc">' + esc(desc.slice(0, 180)) + (desc.length > 180 ? '…' : '') + '</div>' : '')
+          + '</div></div>';
+      });
+      html += '</div>';
+    }
+
+    var block = document.getElementById('subway-status-block');
+    if (block) block.innerHTML = html;
+
+    var changed = maybeChime('subway', sigParts.join('|'), score);
+    if (changed && block) {
+      Array.prototype.forEach.call(block.querySelectorAll('.svc-row.disrupted'), function(r){ r.classList.add('just-changed'); });
+    }
+  }
+
+  function loadSubwayAlerts() {
     fetch('https://alerts.ttc.ca/api/alerts/live-alerts')
       .then(function(r){ return r.json(); })
       .then(function(data) {
-        var alerts = Array.isArray(data.alerts) ? data.alerts : (Array.isArray(data) ? data : []);
-
-        /* Tag each line with matching alerts */
-        LINES.forEach(function(line) {
-          line.active = alerts.filter(function(a) {
-            var t = ((a.title || a.header || '') + ' ' + (a.description || a.body || '')).toLowerCase();
-            return line.kw.some(function(k){ return t.indexOf(k) !== -1; });
-          });
-        });
-
-        /* Build line-status rows */
-        var html = '<div class="subway-title">Subway &amp; LRT Service Status</div>';
-        LINES.forEach(function(line) {
-          var hasAlert = line.active.length > 0;
-          var dotCls, statusCls, statusText;
-          if (line.busSub) {
-            dotCls = 'd-warn'; statusCls = 's-warn'; statusText = 'Bus substitute service';
-          } else if (hasAlert) {
-            dotCls = 'd-warn'; statusCls = 's-warn';
-            statusText = line.active.length + ' alert' + (line.active.length > 1 ? 's' : '');
-          } else {
-            dotCls = 'd-ok'; statusCls = 's-ok'; statusText = 'Good service';
-          }
-          html += '<div class="svc-row">'
-            + '<span class="dot ' + dotCls + '"></span>'
-            + '<span class="line-chip ' + line.cls + '">Line ' + line.num + '</span>'
-            + '<span class="svc-name">' + line.name + '</span>'
-            + '<span class="svc-status ' + statusCls + '">' + statusText + '</span></div>';
-        });
-
-        /* All alerts section */
-        if (alerts.length) {
-          html += '<div class="subway-title" style="padding-top:0.5rem">Active Alerts (' + alerts.length + ')</div>'
-            + '<div class="alerts-scroll">';
-          alerts.forEach(function(a) {
-            var title = a.title || a.header || 'Alert';
-            var desc  = a.description || a.body || a.text || '';
-            html += '<div class="svc-row alert-row">'
-              + '<span class="dot d-warn" style="margin-top:0.2rem;flex-shrink:0"></span>'
-              + '<div style="flex:1;min-width:0">'
-              + '<div class="svc-name">' + esc(title) + '</div>'
-              + (desc ? '<div class="alert-desc">' + esc(desc.slice(0, 160)) + (desc.length > 160 ? '…' : '') + '</div>' : '')
-              + '</div></div>';
-          });
-          html += '</div>';
-        }
-
-        /* Update the subway block in-place */
-        var block = document.getElementById('subway-status-block');
-        if (block) block.innerHTML = html;
+        lastApiSubway = Array.isArray(data.alerts) ? data.alerts : (Array.isArray(data) ? data : []);
+        renderSubway(lastApiSubway);
       })
-      .catch(function(){ /* keep "Good service" defaults */ });
+      .catch(function(){ renderSubway(lastApiSubway); });
   }
 
   /* ================================================================
@@ -1237,6 +1451,58 @@
     });
   }
 
+  /* ================================================================
+     TEST PANEL + SOUND CONTROLS
+     ================================================================ */
+  function toggleSim(key) {
+    if (simActive[key]) delete simActive[key]; else simActive[key] = true;
+    var btn = document.querySelector('.test-btn[data-sim="' + key + '"]');
+    if (btn) btn.classList.toggle('active', !!simActive[key]);
+    /* Re-render instantly from cached live data so the sim shows now */
+    renderSubway(lastApiSubway);
+    renderGoStatus(lastApiGo);
+  }
+
+  function wireControls() {
+    /* Sound toggle */
+    var sndBtn = document.getElementById('snd-btn');
+    if (sndBtn) sndBtn.addEventListener('click', function() {
+      var next = !soundOn;
+      setSound(next);
+      if (next) chime('clear');   /* confirmation blip + unlocks audio */
+    });
+    try { setSound(localStorage.getItem('ttcSound') === '1'); } catch (e) { setSound(false); }
+
+    /* Press "t" to toggle the test panel */
+    document.addEventListener('keydown', function(e) {
+      if ((e.key === 't' || e.key === 'T') && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        var p = document.getElementById('test-panel');
+        if (p) p.classList.toggle('open');
+      }
+    });
+
+    /* Scenario toggles */
+    Array.prototype.forEach.call(document.querySelectorAll('.test-btn[data-sim]'), function(b) {
+      b.addEventListener('click', function() { toggleSim(b.getAttribute('data-sim')); });
+    });
+
+    /* Clear all simulations */
+    var clr = document.getElementById('sim-clear');
+    if (clr) clr.addEventListener('click', function() {
+      simActive = {};
+      Array.prototype.forEach.call(document.querySelectorAll('.test-btn[data-sim]'), function(b){ b.classList.remove('active'); });
+      renderSubway(lastApiSubway);
+      renderGoStatus(lastApiGo);
+    });
+
+    /* Preview the chime */
+    var tc = document.getElementById('test-chime');
+    if (tc) tc.addEventListener('click', function() {
+      if (!soundOn) setSound(true);
+      chime('alert');
+    });
+  }
+
   function refresh() {
     loadWeather();
     loadTTC();
@@ -1247,6 +1513,7 @@
     loadGOTrainStatus();
   }
 
+  wireControls();
   refresh();
   setupLogoFallbacks();
   setInterval(refresh, 60000);
