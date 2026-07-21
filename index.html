@@ -1290,11 +1290,17 @@
     initAudio();
     if (!audioCtx) return;
     function play() {
-      var seq = (kind === 'clear')
+      var clear = kind === 'clear';
+      var seq = clear
         ? [[660,0,0.45,0.16],[988,0.16,0.55,0.16]]                 /* rising = good */
         : [[988,0,0.4,0.19],[740,0.17,0.5,0.19],[587,0.34,0.6,0.19]]; /* falling = attention */
+      var repeats = clear ? 1 : 3;   /* an alert sounds three times */
+      var period = 1.1;              /* spacing between repeats (s) */
       var base = audioCtx.currentTime + 0.06;
-      seq.forEach(function(s){ tone(s[0], base + s[1], s[2], s[3]); });
+      for (var r = 0; r < repeats; r++) {
+        var start = base + r * period;
+        seq.forEach(function(s){ tone(s[0], start + s[1], s[2], s[3]); });
+      }
     }
     if (audioCtx.state === 'suspended') { audioCtx.resume().then(play).catch(play); }
     else { play(); }
