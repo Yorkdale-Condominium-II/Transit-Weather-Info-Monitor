@@ -8,14 +8,15 @@ broken image on screen.
 
 | Operator      | Filename expected      | Where the board uses it        |
 |---------------|------------------------|--------------------------------|
-| TTC           | `ttc.svg`              | "Toronto Transit Commission" header |
-| GO Transit    | `go.svg`               | "GO Transit" header            |
+| TTC           | `ttc.webp`             | "Toronto Transit Commission" header |
+| GO Transit    | `go.webp`              | "GO Transit" header            |
 
 ## Notes
 
-- **Format:** SVG is preferred (stays crisp at any size on the TV). A
-  PNG works too — if you only have a PNG, name it `ttc.png` / `go.png`
-  and let me know so I can point the page at the `.png` file.
+- **Format:** the page currently points at `.webp` files (widely
+  supported, small, and crisp on the TV). SVG or PNG work too — if you
+  switch formats, either rename to `ttc.webp` / `go.webp` or tell me
+  and I'll point the page at the new extension.
 - **Source the official files** from each operator's brand / media
   resources (e.g. Metrolinx/GO media assets, the TTC's brand page).
   Using the operators' own published logo files keeps them accurate
