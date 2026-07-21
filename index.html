@@ -158,6 +158,11 @@
       font-size: 0.65rem; font-weight: 700; text-transform: uppercase;
       letter-spacing: 0.1em; color: var(--muted);
     }
+    /* Operator logo on the right side of a section header */
+    .sec-logo {
+      height: clamp(16px, 2.4vh, 22px); width: auto;
+      margin-left: auto; flex-shrink: 0; display: block;
+    }
     .sec-body { padding: clamp(0.6rem, 1.3vh, 1.25rem); flex: 1; overflow-y: auto; scrollbar-width: none; }
     .sec-body::-webkit-scrollbar { display: none; }
 
@@ -370,20 +375,19 @@
       border-bottom: 1px solid var(--border);
     }
     .ic-card:last-child { border-bottom: none; }
-    .ic-badge {
-      font-size: 0.58rem; font-weight: 700; letter-spacing: 0.03em;
-      padding: 0.2rem 0.5rem; border-radius: 3px;
-      white-space: nowrap; flex-shrink: 0; text-align: center;
-      min-width: 4.5rem;
+    /* Coach operator logo, held in a fixed-width slot so destinations align */
+    .ic-logo-wrap {
+      width: clamp(90px, 12vw, 120px); flex-shrink: 0;
+      display: flex; align-items: center;
     }
-    .ic-megabus { background: #0066CC; color: #fff; }
-    .ic-on      { background: #006633; color: #fff; }
-    .ic-flix    { background: #73D700; color: #000; }
+    .ic-logo { height: clamp(20px, 2.9vh, 27px); width: auto; max-width: 100%; display: block; }
     .ic-dest    { font-size: clamp(0.62rem, 0.9vh, 0.72rem); color: var(--muted); line-height: 1.5; }
 
     /* VIA Rail */
     .via-stripe { background: var(--via); }
     .via-chip { background: var(--via); color: #fff; }
+    /* Logo sitting inline inside a subway-title bar */
+    .title-logo { height: 15px; width: auto; vertical-align: middle; margin-right: 0.4rem; position: relative; top: -1px; }
 
     /* Next-departure feature (Union Station timing) */
     .union-after {
@@ -477,6 +481,10 @@
         <div class="sec-head">
           <div class="sec-stripe ttc-stripe"></div>
           <span class="sec-label">Toronto Transit Commission</span>
+          <svg class="sec-logo" viewBox="0 0 58 22" role="img" aria-label="TTC">
+            <rect width="58" height="22" rx="4" fill="#DA251D"/>
+            <text x="29" y="16.5" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-weight="800" font-size="13" letter-spacing="2" fill="#fff">TTC</text>
+          </svg>
         </div>
         <div class="sec-body" id="ttc-body">
           <div class="state-msg">Loading…</div>
@@ -487,6 +495,11 @@
         <div class="sec-head">
           <div class="sec-stripe go-stripe"></div>
           <span class="sec-label">GO Transit</span>
+          <svg class="sec-logo" viewBox="0 0 90 22" role="img" aria-label="GO Transit">
+            <rect width="90" height="22" rx="4" fill="#00853F"/>
+            <text x="8" y="17" font-family="Arial,Helvetica,sans-serif" font-style="italic" font-weight="900" font-size="15" fill="#fff">GO</text>
+            <text x="35" y="15" font-family="Arial,Helvetica,sans-serif" font-weight="700" font-size="8.5" letter-spacing="1.5" fill="#fff">TRANSIT</text>
+          </svg>
         </div>
         <div class="sec-body" id="go-body">
           <div class="state-msg">Loading…</div>
@@ -1037,30 +1050,49 @@
   }
 
   /* ================================================================
+     OPERATOR LOGOS — simple, self-contained SVG wordmarks in each
+     operator's brand colours (evoke the brand, not exact artwork)
+     ================================================================ */
+  var LOGOS = {
+    via: '<svg class="title-logo" viewBox="0 0 72 20" role="img" aria-label="VIA Rail">'
+       + '<rect width="72" height="20" rx="3" fill="#FFC72C"/>'
+       + '<text x="7" y="15" font-family="Arial,Helvetica,sans-serif" font-style="italic" font-weight="900" font-size="13" fill="#1A1A1A">VIA</text>'
+       + '<text x="37" y="14.5" font-family="Arial,Helvetica,sans-serif" font-weight="700" font-size="9" fill="#1A1A1A">Rail</text></svg>',
+    megabus: '<svg class="ic-logo" viewBox="0 0 104 26" role="img" aria-label="Megabus">'
+       + '<rect width="104" height="26" rx="13" fill="#004990"/>'
+       + '<circle cx="16" cy="13" r="6" fill="#FDB913"/>'
+       + '<text x="28" y="18" font-family="Arial,Helvetica,sans-serif" font-weight="800" font-size="12.5" fill="#fff">megabus</text></svg>',
+    ontario: '<svg class="ic-logo" viewBox="0 0 120 26" role="img" aria-label="Ontario Northland">'
+       + '<rect width="120" height="26" rx="4" fill="#00705A"/>'
+       + '<text x="9" y="12" font-family="Arial,Helvetica,sans-serif" font-weight="800" font-size="8.5" letter-spacing="0.5" fill="#fff">ONTARIO</text>'
+       + '<text x="9" y="21.5" font-family="Arial,Helvetica,sans-serif" font-weight="800" font-size="8.5" letter-spacing="0.5" fill="#fff">NORTHLAND</text></svg>',
+    flix: '<svg class="ic-logo" viewBox="0 0 92 26" role="img" aria-label="FlixBus">'
+       + '<rect width="92" height="26" rx="13" fill="#73D700"/>'
+       + '<text x="46" y="18" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-weight="800" font-size="13" fill="#fff">FlixBus</text></svg>'
+  };
+
+  /* ================================================================
      INTERCITY COLUMN — VIA Rail + coaches
      ================================================================ */
   function renderIntercity() {
     var coaches = [
       {
-        cls:   'ic-megabus',
-        badge: 'Megabus',
+        logo:  'megabus',
         dests: ['Hamilton · London · Ottawa', 'Montréal · Kingston · Niagara']
       },
       {
-        cls:   'ic-on',
-        badge: 'Ont. Northland',
+        logo:  'ontario',
         dests: ['Barrie · Huntsville · North Bay', 'Sudbury · New Liskeard · Timmins']
       },
       {
-        cls:   'ic-flix',
-        badge: 'FlixBus',
+        logo:  'flix',
         dests: ['Ottawa · Montréal', 'London · Niagara Falls']
       }
     ];
 
     /* VIA Rail section */
     var h = '<div class="subway-block">'
-      + '<div class="subway-title">VIA Rail — Union Station</div>'
+      + '<div class="subway-title">' + LOGOS.via + 'VIA Rail — Union Station</div>'
       + unionAfterBanner();
 
     VIA_ROUTES.forEach(function(r) {
@@ -1086,7 +1118,7 @@
 
     coaches.forEach(function(co) {
       h += '<div class="ic-card">'
-        + '<span class="ic-badge ' + co.cls + '">' + esc(co.badge) + '</span>'
+        + '<span class="ic-logo-wrap">' + LOGOS[co.logo] + '</span>'
         + '<div class="ic-dest">' + co.dests.map(esc).join('<br>') + '</div>'
         + '</div>';
     });
