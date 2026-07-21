@@ -1271,24 +1271,33 @@
     try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
     catch (e) { audioCtx = null; }
   }
-  function tone(freq, startAt, dur, peak) {
+  /* Schedule one tone at an absolute AudioContext time */
+  function tone(freq, at, dur, peak) {
     if (!audioCtx) return;
     var osc = audioCtx.createOscillator(), g = audioCtx.createGain();
     osc.type = 'sine'; osc.frequency.value = freq;
     osc.connect(g); g.connect(audioCtx.destination);
-    var t0 = audioCtx.currentTime + startAt;
-    g.gain.setValueAtTime(0.0001, t0);
-    g.gain.exponentialRampToValueAtTime(peak, t0 + 0.03);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    osc.start(t0); osc.stop(t0 + dur + 0.03);
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(peak, at + 0.03);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    osc.start(at); osc.stop(at + dur + 0.03);
   }
-  /* kind: 'alert' (something went down) or 'clear' (recovered) */
+  /* kind: 'alert' (something went down) or 'clear' (recovered).
+     A freshly-created context starts suspended, and resume() is async
+     — schedule the tones only once it is running, with a small
+     lookahead so the first note is never dropped. */
   function chime(kind) {
     initAudio();
     if (!audioCtx) return;
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    if (kind === 'clear') { tone(660, 0, 0.45, 0.16); tone(988, 0.16, 0.55, 0.16); }   /* rising = good */
-    else { tone(988, 0, 0.4, 0.19); tone(740, 0.17, 0.5, 0.19); tone(587, 0.34, 0.6, 0.19); } /* falling = attention */
+    function play() {
+      var seq = (kind === 'clear')
+        ? [[660,0,0.45,0.16],[988,0.16,0.55,0.16]]                 /* rising = good */
+        : [[988,0,0.4,0.19],[740,0.17,0.5,0.19],[587,0.34,0.6,0.19]]; /* falling = attention */
+      var base = audioCtx.currentTime + 0.06;
+      seq.forEach(function(s){ tone(s[0], base + s[1], s[2], s[3]); });
+    }
+    if (audioCtx.state === 'suspended') { audioCtx.resume().then(play).catch(play); }
+    else { play(); }
   }
   function setSound(on) {
     soundOn = on;
